@@ -47,9 +47,7 @@ fn set_window_icon(
         let Some(primary) = windows.get_window(*primary_window) else {
             return Err(BevyError::from("No primary window!"));
         };
-        let icon_buf = Cursor::new(include_bytes!(
-            "../build/macos/AppIcon.iconset/icon_256x256.png"
-        ));
+        let icon_buf = Cursor::new(include_bytes!("../assets/textures/bevy.png"));
         if let Ok(image) = image::load(icon_buf, image::ImageFormat::Png) {
             let image = image.into_rgba8();
             let (width, height) = image.dimensions();
