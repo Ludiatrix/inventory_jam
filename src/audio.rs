@@ -38,7 +38,7 @@ fn control_flying_sound(
     audio: Res<FlyingAudio>,
     mut audio_instances: ResMut<Assets<AudioInstance>>,
 ) {
-    if let Some(instance) = audio_instances.get_mut(&audio.0) {
+    if let Some(mut instance) = audio_instances.get_mut(&audio.0) {
         match instance.state() {
             PlaybackState::Paused { .. } if actions.player_movement.is_some() => {
                 instance.resume(AudioTween::default());

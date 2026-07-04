@@ -1,8 +1,8 @@
 [package]
-name = "bevy_game" # ToDo
+name = "rust_jam"
 version = "0.1.0"
 publish = false
-authors = ["Niklas Eicker <git@nikl.me>"] # ToDo: you are the author ;)
+authors = ["PIGSquad Rustaceans"]
 edition = "2024"
 exclude = ["dist", "build", "assets"]
 
@@ -34,12 +34,10 @@ dev = [
 
 # All of Bevy's default features exept for the audio related ones (bevy_audio, vorbis), since they clash with bevy_kira_audio
 [dependencies]
-bevy = { version = "0.18.0", default-features = false, features = [
+bevy = { version = "0.19", default-features = false, features = [
     "default_app",
     "2d_api",
     "2d_bevy_render",
-    "3d_api",
-    "3d_bevy_render",
     "ui_api",
     "ui_bevy_render",
     "scene",
@@ -53,8 +51,8 @@ bevy = { version = "0.18.0", default-features = false, features = [
     "wayland",
     "sysinfo_plugin",
 ] }
-bevy_kira_audio = { version = "0.25" }
-bevy_asset_loader = { version = "0.25.0" }
+bevy_kira_audio = { version = "0.26" }
+bevy_asset_loader = { version = "0.27" }
 rand = { version = "0.9" }
 webbrowser = { version = "1", features = ["hardened"] }
 

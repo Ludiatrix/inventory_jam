@@ -66,7 +66,7 @@ fn setup_menu(mut commands: Commands, textures: Res<TextureAssets>) {
                 .with_child((
                     Text::new("Play"),
                     TextFont {
-                        font_size: 40.0,
+                        font_size: FontSize::Px(40.0),
                         ..default()
                     },
                     TextColor(Color::linear_rgb(0.9, 0.9, 0.9)),
@@ -108,7 +108,7 @@ fn setup_menu(mut commands: Commands, textures: Res<TextureAssets>) {
                     parent.spawn((
                         Text::new("Made with Bevy"),
                         TextFont {
-                            font_size: 15.0,
+                            font_size: FontSize::Px(15.0),
                             ..default()
                         },
                         TextColor(Color::linear_rgb(0.9, 0.9, 0.9)),
@@ -146,7 +146,7 @@ fn setup_menu(mut commands: Commands, textures: Res<TextureAssets>) {
                     parent.spawn((
                         Text::new("Open source"),
                         TextFont {
-                            font_size: 15.0,
+                            font_size: FontSize::Px(15.0),
                             ..default()
                         },
                         TextColor(Color::linear_rgb(0.9, 0.9, 0.9)),

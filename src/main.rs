@@ -7,7 +7,7 @@ use bevy::ecs::system::NonSendMarker;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy::winit::WINIT_WINDOWS;
-use bevy_game::GamePlugin; // ToDo: Replace bevy_game with your new crate name.
+use rust_jam::GamePlugin;
 use std::io::Cursor;
 use winit::window::Icon;
 
