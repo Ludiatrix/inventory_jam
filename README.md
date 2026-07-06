@@ -1,57 +1,35 @@
-# A Bevy game template
+# Simple box
 
-Template for a Game using the awesome [Bevy engine][bevy] featuring out of the box builds for Windows, Linux, and Web (Wasm).
+A simple example that shows how to use Lightyear to create a server-authoritative multiplayer game.
 
-# What does this template give you?
+It also showcases how to enable client-side prediction and snapshot interpolation:
+- For the client sending inputs: the pink cube is client-predicted (so inputs are used with no delay, and there is a rollback in case of mismatch with the server) and the red cube shows the received server state. (the server state arrives with some delay, and is a bit choppy since the replication rate is only 10Hz).
+- For the other clients: the red cube still shows the server states arriving at 10Hz, and the pink cube is a smooth interpolation between those states (there is a slight delay because we can only interpolate between 2 received server states).
 
-* small example ["game"](https://niklasei.github.io/bevy_game_template/)
-* easy setup for running the web build using [trunk] (`trunk serve`)
-* run the native version with `cargo run`
-* workflow for GitHub actions creating releases for Windows, Linux, and Web (Wasm) ready for distribution
-    * push a tag in the form of `v[0-9]+.[0-9]+.[0-9]+*` (e.g. `v1.1.42`) to trigger the flow
-* CI workflow that checks your application on Windows and Linux on every push
+https://github.com/cBournhonesque/lightyear/assets/8112632/7b57d48a-d8b0-4cdd-a16f-f991a394c852
 
-# How to use this template?
+## Running an example
 
- 1. Click "Use this template" on the repository's page
- 2. Look for `ToDo` to use your own game name everywhere
- 3. [Update the icons as described below](#updating-the-icons)
- 4. Start coding :tada:
-    * Start the native app: `cargo run`
-    * Start the web build: `trunk serve`
-        * requires [trunk]: `cargo install --locked trunk`
-        * requires `wasm32-unknown-unknown` target: `rustup target add wasm32-unknown-unknown`
-        * this will serve your app on `8080` and automatically rebuild + reload it after code changes
+- Run the server with a gui: `cargo run -- server`
+- Run client with id 1: `cargo run -- client -c 1`
 
-### Updating the icons
+[//]: # (- Run the client and server in two separate bevy Apps: `cargo run` or `cargo run separate`)
+- Run the server without a gui: `cargo run --no-default-features --features=server -- server`
+- Run a headless client without a gui: `cargo run --no-default-features --features=client,netcode,webtransport -- client -c 1`
+- Run the client and server in "HostClient" mode, where the client also acts as server (both are in the same App) : `cargo run -- host-client -c 0`
 
- 1. Replace `build/windows/icon.ico` (used for windows executable and as favicon for the web-builds)
-    * You can create an `.ico` file for windows by following these steps:
-       1. Open your icon image in [Gimp](https://www.gimp.org/downloads/)
-       2. Select the `File > Export As` menu item.
-       3. Change the file extension to `.ico` (or click `Select File Type (By Extension)` and select `Microsoft Windows Icon`)
-       4. Save as `build/windows/icon.ico`
+You can control the behaviour of the example by changing the list of features. By default, all features are enabled (client, server, gui).
+For example you can run the server in headless mode (without gui) by running `cargo run --no-default-features --features=server,webtransport,netcode`.
 
-### Deploy web build to GitHub pages
+For automated headless verification, you can set `LIGHTYEAR_SIMPLE_BOX_AUTOMOVE=right` on one client and
+`LIGHTYEAR_SIMPLE_BOX_LOG_POSITIONS=1` on another client to confirm from logs that the interpolated remote player
+keeps receiving `PlayerPosition` updates.
 
- 1. Trigger the `deploy-github-page` workflow
- 2. Activate [GitHub pages](https://pages.github.com/) for your repository
-     1. Source from the `gh-pages` branch (created by the just executed action)
- 3. After a few minutes your game is live at `http://username.github.io/repository`
+### Testing in wasm with webtransport
 
-To deploy newer versions, just run the `deploy-github-page` workflow again.
+NOTE: I am using the [bevy cli](https://github.com/TheBevyFlock/bevy_cli) to build and serve the wasm example.
 
-# Getting started with Bevy
+To test the example in wasm, you can run the following commands: `bevy run web`
 
-You should check out the Bevy website for [links to resources][bevy-learn] and the [Bevy Cheat Book] for a bunch of helpful documentation and examples. I can also recommend the [official Bevy Discord server][bevy-discord] for keeping up to date with the development and getting help from other Bevy users.
-
-# Known issues
-
-Audio in web-builds can have issues in some browsers. This seems to be a general performance issue and not due to the audio itself (see [bevy_kira_audio/#9][firefox-sound-issue]).
-
-[bevy]: https://bevyengine.org/
-[bevy-learn]: https://bevyengine.org/learn/
-[bevy-discord]: https://discord.gg/bevy
-[firefox-sound-issue]: https://github.com/NiklasEi/bevy_kira_audio/issues/9
-[Bevy Cheat Book]: https://bevy-cheatbook.github.io/introduction.html
-[trunk]: https://github.com/trunk-rs/trunk
+The repo includes a pre-generated self-signed WebTransport certificate and digest, so `certificates/generate.sh` is not required for the usual local workflow while that certificate is valid. If it expires, or if you want to replace it, generate a new temporary self-signed certificate with:
+- `cd "$(git rev-parse --show-toplevel)" && sh certificates/generate.sh` (writes `certificates/cert.pem`, `certificates/key.pem`, and `certificates/digest.txt`; rebuild wasm clients after regenerating so they embed the new digest)

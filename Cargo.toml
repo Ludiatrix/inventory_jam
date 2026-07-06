@@ -1,5 +1,5 @@
 [package]
-name = "rust_jam"
+name = "inventory_jam"
 version = "0.1.0"
 publish = false
 authors = ["PIGSquad Rustaceans"]
@@ -31,6 +31,18 @@ strip = true
 dev = [
     "bevy/dynamic_linking",
 ]
+default = ["client", "gui", "server", "netcode"]
+client = ["lightyear/client", "lightyear_examples_common/client"]
+gui = ["lightyear_examples_common/gui2d"]
+server = [
+    "lightyear/client",
+    "lightyear/server",
+    "lightyear_examples_common/client",
+    "lightyear_examples_common/server",
+]
+netcode = ["lightyear_examples_common/netcode"]
+udp = ["lightyear_examples_common/udp", "lightyear/std", "lightyear/udp"]
+steam = ["lightyear_examples_common/steam"]
 
 # All of Bevy's default features exept for the audio related ones (bevy_audio, vorbis), since they clash with bevy_kira_audio
 [dependencies]
@@ -61,11 +73,24 @@ winit = { version = "0.30", default-features = false }
 image = { version = "0.25", default-features = false }
 ## This greatly improves WGPU's performance due to its heavy use of trace! calls
 log = { version = "0.4", features = ["max_level_debug", "release_max_level_warn"] }
+lightyear = { version = "0.28.0", features = [
+    "interpolation",
+    "prediction",
+    "replication",
+    "input_native",
+] }
+lightyear_examples_common = "0.28.0"
+serde = "1.0.228"
 
 # Required to make `rand`/`getrandom` work on wasm.
 # Backend is selected via `.cargo/config.toml` rustflags for the wasm32-unknown-unknown target.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { version = "0.3", features = ["wasm_js"] }
+getrandom = { version = "0.4.3", features = ["wasm_js"] }
 
 [build-dependencies]
-embed-resource = "1"
+embed-resource = "3.0.11"
+
+[package.metadata.bevy_cli.web]
+rustflags = ["--cfg", "getrandom_backend=\"wasm_js\""]
+default-features = false
+features = ["client", "netcode", "webtransport"]

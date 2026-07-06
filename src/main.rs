@@ -1,61 +1,66 @@
-// disable console on windows for release builds
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+//! This example showcases how to use Lightyear with Bevy, to easily get replication along with prediction/interpolation working.
+//!
+//! There is a lot of setup code, but it's mostly to have the examples work in all possible configurations of transport.
+//! (all transports are supported, as well as running the example in client-and-server or host-server mode)
+//!
+//!
+//! Run with
+//! - `cargo run -- server`
+//! - `cargo run -- client -c 1`
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+#![allow(dead_code)]
 
-use bevy::DefaultPlugins;
-use bevy::asset::AssetMetaCheck;
-use bevy::ecs::system::NonSendMarker;
+#[cfg(feature = "client")]
+use crate::client::ExampleClientPlugin;
+#[cfg(feature = "server")]
+use crate::server::ExampleServerPlugin;
+use crate::shared::SharedPlugin;
 use bevy::prelude::*;
-use bevy::window::PrimaryWindow;
-use bevy::winit::WINIT_WINDOWS;
-use rust_jam::GamePlugin;
-use std::io::Cursor;
-use winit::window::Icon;
+use core::time::Duration;
+use lightyear_examples_common::cli::{Cli, Mode};
 
+use lightyear_examples_common::shared::FIXED_TIMESTEP_HZ;
+
+#[cfg(feature = "client")]
+mod client;
+mod protocol;
+#[cfg(feature = "gui")]
+mod renderer;
+#[cfg(feature = "server")]
+mod server;
+
+mod shared;
+
+/// When running the example as a binary, we only support Client or Server mode.
 fn main() {
-    App::new()
-        .insert_resource(ClearColor(Color::linear_rgb(0.4, 0.4, 0.4)))
-        .add_plugins(
-            DefaultPlugins
-                .set(WindowPlugin {
-                    primary_window: Some(Window {
-                        title: "Bevy game".to_string(), // ToDo
-                        // Bind to canvas included in `index.html`
-                        canvas: Some("#bevy".to_owned()),
-                        fit_canvas_to_parent: true,
-                        // Tells wasm not to override default event handling, like F5 and Ctrl+R
-                        prevent_default_event_handling: false,
-                        ..default()
-                    }),
-                    ..default()
-                })
-                .set(AssetPlugin {
-                    meta_check: AssetMetaCheck::Never,
-                    ..default()
-                }),
-        )
-        .add_plugins(GamePlugin)
-        .add_systems(Startup, set_window_icon)
-        .run();
-}
+    let cli = Cli::default();
 
-// Sets the icon on windows and X11
-fn set_window_icon(
-    primary_window: Single<Entity, With<PrimaryWindow>>,
-    _non_send_marker: NonSendMarker,
-) -> Result {
-    WINIT_WINDOWS.with_borrow(|windows| {
-        let Some(primary) = windows.get_window(*primary_window) else {
-            return Err(BevyError::from("No primary window!"));
-        };
-        let icon_buf = Cursor::new(include_bytes!("../assets/textures/bevy.png"));
-        if let Ok(image) = image::load(icon_buf, image::ImageFormat::Png) {
-            let image = image.into_rgba8();
-            let (width, height) = image.dimensions();
-            let rgba = image.into_raw();
-            let icon = Icon::from_rgba(rgba, width, height).unwrap();
-            primary.set_window_icon(Some(icon));
-        };
+    let mut app = cli.build_app(Duration::from_secs_f64(1.0 / FIXED_TIMESTEP_HZ), true);
 
-        Ok(())
-    })
+    app.add_plugins(SharedPlugin);
+
+    cli.spawn_connections(&mut app);
+
+    match cli.mode {
+        #[cfg(feature = "client")]
+        Some(Mode::Client { .. }) => {
+            app.add_plugins(ExampleClientPlugin);
+        }
+        #[cfg(feature = "server")]
+        Some(Mode::Server) => {
+            app.add_plugins(ExampleServerPlugin);
+        }
+        #[cfg(all(feature = "client", feature = "server"))]
+        Some(Mode::HostClient { client_id }) => {
+            app.add_plugins(ExampleClientPlugin);
+            app.add_plugins(ExampleServerPlugin);
+        }
+        _ => {}
+    }
+
+    #[cfg(feature = "gui")]
+    app.add_plugins(renderer::ExampleRendererPlugin);
+
+    app.run();
 }
