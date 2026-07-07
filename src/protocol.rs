@@ -85,12 +85,6 @@ pub struct Direction {
     pub(crate) right: bool,
 }
 
-impl Direction {
-    pub(crate) fn is_none(&self) -> bool {
-        !self.up && !self.down && !self.left && !self.right
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Reflect)]
 pub enum Inputs {
     Direction(Direction),
@@ -103,7 +97,7 @@ impl Default for Inputs {
 }
 
 impl MapEntities for Inputs {
-    fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {}
+    fn map_entities<M: EntityMapper>(&mut self, _entity_mapper: &mut M) {}
 }
 
 // Protocol
