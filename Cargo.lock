@@ -4325,6 +4325,7 @@ dependencies = [
 name = "inventory_jam"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bevy",
  "bevy_asset_loader",
  "bevy_kira_audio",
