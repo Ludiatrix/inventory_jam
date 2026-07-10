@@ -9,12 +9,8 @@ use bevy::prelude::*;
 pub use channels::ServerEventsChannel;
 pub use inputs::PlayerAction;
 pub use messages::DebugServerMessage;
-pub use player::{PlayerColor, PlayerId, PlayerPosition};
-pub use projectile::{
-    PlayerProjectile,
-    ProjectileLifetime,
-    ProjectilePosition,
-};
+pub use player::{PlayerAimDirection, PlayerColor, PlayerId, PlayerPosition};
+pub use projectile::{PlayerProjectile, ProjectileLifetime, ProjectilePosition};
 
 #[derive(Clone)]
 pub struct ProtocolPlugin;

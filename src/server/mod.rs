@@ -1,4 +1,5 @@
 mod player;
+mod projectile;
 
 use bevy::prelude::*;
 use lightyear::prelude::server::*;
@@ -9,6 +10,9 @@ use crate::protocol::messages::DebugServerMessage;
 use crate::protocol::*;
 use player::*;
 
+use projectile::{
+    fire_player_projectiles, simulate_server_projectiles, update_player_aim_direction,
+};
 pub struct ExampleServerPlugin;
 
 impl Plugin for ExampleServerPlugin {
@@ -18,7 +22,16 @@ impl Plugin for ExampleServerPlugin {
         app.add_observer(handle_new_client);
         app.add_observer(handle_connected);
 
-        app.add_systems(FixedUpdate, authoritative_player_movement);
+        app.add_systems(
+            FixedUpdate,
+            (
+                authoritative_player_movement,
+                update_player_aim_direction,
+                fire_player_projectiles,
+                simulate_server_projectiles,
+            )
+                .chain(),
+        );
         app.add_systems(Update, send_debug_server_message);
     }
 }

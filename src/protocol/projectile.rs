@@ -4,15 +4,11 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct PlayerProjectile {
+    pub origin: Vec2,
     pub direction: Vec2,
     pub speed_per_tick: f32,
 }
 
-/// Local simulation state.
-///
-/// This component is deliberately not registered for replication. The server
-/// and each client calculate it independently from the replicated projectile
-/// data.
 #[derive(Component, Clone, Copy, Debug, PartialEq, Deref, DerefMut)]
 pub struct ProjectilePosition(pub Vec2);
 

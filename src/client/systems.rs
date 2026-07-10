@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, window::PrimaryWindow};
 use leafwing_input_manager::prelude::*;
 use lightyear::prelude::*;
 
@@ -82,4 +82,27 @@ pub(crate) fn handle_interpolated_spawn(
         };
         color.0 = Color::from(hsva);
     }
+}
+
+pub(crate) fn update_cursor_aim(
+    window: Single<&Window, With<PrimaryWindow>>,
+    camera: Single<(&Camera, &GlobalTransform), With<Camera2d>>,
+    mut player: Single<(&PlayerPosition, &mut ActionState<PlayerAction>), With<Predicted>>,
+) {
+    let Some(cursor_position) = window.cursor_position() else {
+        return;
+    };
+
+    let (camera, camera_transform) = camera.into_inner();
+
+    let Ok(cursor_world_position) = camera.viewport_to_world_2d(camera_transform, cursor_position)
+    else {
+        return;
+    };
+
+    let (player_position, mut actions) = player.into_inner();
+
+    let direction = (cursor_world_position - player_position.0).normalize_or_zero();
+
+    actions.set_axis_pair(&PlayerAction::Aim, direction);
 }

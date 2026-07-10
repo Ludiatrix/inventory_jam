@@ -8,6 +8,7 @@ pub(crate) struct PlayerBundle {
     id: PlayerId,
     position: PlayerPosition,
     color: PlayerColor,
+    aim_direction: PlayerAimDirection,
 }
 
 impl PlayerBundle {
@@ -19,6 +20,7 @@ impl PlayerBundle {
             id: PlayerId(id),
             position: PlayerPosition(position),
             color: PlayerColor(color),
+            aim_direction: PlayerAimDirection::default(),
         }
     }
 }
@@ -49,4 +51,13 @@ pub fn register(app: &mut App) {
         .add_linear_interpolation();
 
     app.component::<PlayerColor>().replicate();
+}
+
+#[derive(Component, Clone, Copy, Debug, PartialEq)]
+pub struct PlayerAimDirection(pub Vec2);
+
+impl Default for PlayerAimDirection {
+    fn default() -> Self {
+        Self(Vec2::X)
+    }
 }
