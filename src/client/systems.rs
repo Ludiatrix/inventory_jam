@@ -7,6 +7,9 @@ use crate::{
     shared,
 };
 
+/// How quickly should the camera snap to the desired location.
+const CAMERA_DECAY_RATE: f32 = 2.;
+
 /// The client input only gets applied to predicted entities that we own
 /// This works because we only predict the user's controlled entity.
 /// If we were predicting more entities, we would have to only apply movement to the player owned one.
@@ -21,6 +24,19 @@ pub(crate) fn player_movement(
     for (position, actions) in position_query.iter_mut() {
         shared::shared_movement_behaviour(position, actions);
     }
+}
+
+/// Client-only system that smoothly moves the camera to the center of the Player's position.
+pub(crate) fn update_camera(
+    mut camera: Single<&mut Transform, With<Camera2d>>,
+    player: Single<&PlayerPosition, With<Predicted>>,
+    time: Res<Time>,
+) {
+    let target = player.0.extend(camera.translation.z);
+
+    camera
+        .translation
+        .smooth_nudge(&target, CAMERA_DECAY_RATE, time.delta_secs());
 }
 
 /// System to receive messages on the client

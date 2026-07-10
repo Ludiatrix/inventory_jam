@@ -10,13 +10,14 @@ mod systems;
 
 use bevy::prelude::*;
 use player::*;
-use systems::{handle_predicted_spawn, player_movement, receive_message1};
+use systems::{handle_predicted_spawn, player_movement, receive_message1, update_camera};
 
 pub struct ExampleClientPlugin;
 
 impl Plugin for ExampleClientPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(FixedUpdate, player_movement);
+        app.add_systems(Update, update_camera);
 
         app.add_systems(Update, receive_message1);
         app.add_observer(handle_predicted_spawn);
