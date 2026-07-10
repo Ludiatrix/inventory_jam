@@ -87,7 +87,7 @@ pub(crate) fn handle_interpolated_spawn(
 pub(crate) fn update_cursor_aim(
     window: Single<&Window, With<PrimaryWindow>>,
     camera: Single<(&Camera, &GlobalTransform), With<Camera2d>>,
-    mut player: Single<(&PlayerPosition, &mut ActionState<PlayerAction>), With<Predicted>>,
+    player: Single<(&PlayerPosition, &mut ActionState<PlayerAction>), With<Predicted>>,
 ) {
     let Some(cursor_position) = window.cursor_position() else {
         return;
