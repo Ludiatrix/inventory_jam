@@ -93,6 +93,7 @@ leafwing-input-manager = { version = "0.21", features = [
 serde = "1.0.228"
 clap = "4.6.1"
 cfg-if = "1.0.4"
+anyhow = "1.0.103"
 
 # Required to make `rand`/`getrandom` work on wasm.
 # Backend is selected via `.cargo/config.toml` rustflags for the wasm32-unknown-unknown target.

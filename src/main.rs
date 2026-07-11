@@ -24,12 +24,12 @@ use lightyear_examples_common::shared::FIXED_TIMESTEP_HZ;
 
 #[cfg(feature = "client")]
 mod client;
+mod projectile;
 mod protocol;
 #[cfg(feature = "gui")]
 mod renderer;
 #[cfg(feature = "server")]
 mod server;
-
 mod shared;
 
 /// When running the example as a binary, we only support Client or Server mode.

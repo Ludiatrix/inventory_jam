@@ -1,4 +1,4 @@
-use crate::{protocol::*, shared};
+use crate::{projectile::render::draw_projectiles, protocol::*, shared};
 use bevy::prelude::*;
 
 const GRID_SPACING: f32 = 100.0;
@@ -9,7 +9,7 @@ pub struct ExampleRendererPlugin;
 impl Plugin for ExampleRendererPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (init, setup_instructions));
-        app.add_systems(Update, (draw_test_world, draw_boxes));
+        app.add_systems(Update, (draw_test_world, draw_boxes, draw_projectiles));
     }
 }
 
