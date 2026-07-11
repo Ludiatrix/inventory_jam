@@ -1,4 +1,4 @@
-use crate::{protocol::*, shared};
+use crate::{projectile::render::draw_projectiles, protocol::*, shared};
 use bevy::prelude::*;
 
 const GRID_SPACING: f32 = 100.0;
@@ -93,16 +93,6 @@ pub(crate) fn draw_aimstick(
         gizmos.circle_2d(
             Isometry2d::from_translation(end),
             5.0,
-            Color::srgb(1.0, 0.85, 0.2),
-        );
-    }
-}
-
-pub(crate) fn draw_projectiles(mut gizmos: Gizmos, projectiles: Query<&ProjectilePosition>) {
-    for position in &projectiles {
-        gizmos.circle_2d(
-            Isometry2d::from_translation(position.0),
-            shared::PROJECTILE_RADIUS,
             Color::srgb(1.0, 0.85, 0.2),
         );
     }

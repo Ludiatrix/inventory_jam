@@ -1,18 +1,15 @@
 mod player;
-mod projectile;
 
 use bevy::prelude::*;
 use lightyear::prelude::server::*;
 use lightyear::prelude::*;
 use lightyear_examples_common::shared::SEND_INTERVAL;
 
+use crate::projectile::server::{fire_player_projectiles, simulate_server_projectiles};
 use crate::protocol::messages::DebugServerMessage;
 use crate::protocol::*;
 use player::*;
 
-use projectile::{
-    fire_player_projectiles, simulate_server_projectiles, update_player_aim_direction,
-};
 pub struct ExampleServerPlugin;
 
 impl Plugin for ExampleServerPlugin {

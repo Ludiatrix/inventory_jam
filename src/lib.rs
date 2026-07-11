@@ -6,7 +6,7 @@ pub mod client;
 #[cfg(feature = "server")]
 pub mod server;
 
+pub mod projectile;
 #[cfg(feature = "gui")]
 pub mod renderer;
-
 pub mod shared;

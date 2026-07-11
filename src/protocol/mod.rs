@@ -2,7 +2,6 @@ pub mod channels;
 pub mod inputs;
 pub mod messages;
 pub mod player;
-pub mod projectile;
 
 use bevy::prelude::*;
 
@@ -10,7 +9,9 @@ pub use channels::ServerEventsChannel;
 pub use inputs::PlayerAction;
 pub use messages::DebugServerMessage;
 pub use player::{PlayerAimDirection, PlayerColor, PlayerId, PlayerPosition};
-pub use projectile::{PlayerProjectile, ProjectileLifetime, ProjectilePosition};
+
+pub use crate::projectile::protocol::PlayerProjectile;
+pub use crate::projectile::shared::{ProjectileLifetime, ProjectilePosition};
 
 #[derive(Clone)]
 pub struct ProtocolPlugin;
@@ -21,6 +22,6 @@ impl Plugin for ProtocolPlugin {
         messages::register(app);
         inputs::register(app);
         player::register(app);
-        projectile::register(app);
+        crate::projectile::protocol::register(app);
     }
 }

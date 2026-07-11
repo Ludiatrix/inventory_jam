@@ -3,41 +3,15 @@ use leafwing_input_manager::prelude::*;
 use lightyear::prelude::*;
 
 use crate::{
-    protocol::{
-        PlayerAction, PlayerAimDirection, PlayerPosition, PlayerProjectile, ProjectileLifetime,
-        ProjectilePosition,
+    projectile::{
+        protocol::PlayerProjectile,
+        shared::{
+            self as projectile_shared, ProjectileLifetime, ProjectilePosition, ServerProjectile,
+        },
     },
+    protocol::{PlayerAction, PlayerAimDirection, PlayerPosition},
     shared,
 };
-
-pub(crate) fn update_player_aim_direction(
-    mut players: Query<(
-        &ActionState<PlayerAction>,
-        &mut PlayerAimDirection,
-        Has<Predicted>,
-    )>,
-    host_server: Query<(), With<lightyear::connection::host::HostServer>>,
-) {
-    let is_host_server = !host_server.is_empty();
-
-    for (actions, mut aim_direction, predicted) in &mut players {
-        if is_host_server && predicted {
-            continue;
-        }
-
-        let aim = actions.clamped_axis_pair(&PlayerAction::Aim);
-
-        info!(
-            ?aim,
-            current = ?aim_direction.0,
-            "SERVER inspected aim before projectile"
-        );
-
-        if aim.length_squared() > 0.0001 {
-            aim_direction.0 = aim.normalize_or_zero();
-        }
-    }
-}
 
 pub(crate) fn fire_player_projectiles(
     mut commands: Commands,
@@ -63,38 +37,50 @@ pub(crate) fn fire_player_projectiles(
         let direction = aim_direction.0.normalize_or_zero();
 
         if direction == Vec2::ZERO {
+            warn!("Projectile skipped because aim direction was zero");
             continue;
         }
 
-        let spawn_position = player_position.0 + direction * shared::PROJECTILE_SPAWN_OFFSET;
+        let spawn_position =
+            projectile_shared::projectile_spawn_position(player_position.0, direction);
+
+        info!(
+            position = ?player_position.0,
+            ?direction,
+            "SERVER firing projectile"
+        );
 
         commands.spawn((
             PlayerProjectile {
                 origin: spawn_position,
                 direction,
-                speed_per_tick: shared::PROJECTILE_SPEED_PER_TICK,
+                speed_per_tick: projectile_shared::PROJECTILE_SPEED_PER_TICK,
             },
             ProjectilePosition(spawn_position),
             ProjectileLifetime {
-                remaining_ticks: shared::PROJECTILE_LIFETIME_TICKS,
+                remaining_ticks: projectile_shared::PROJECTILE_LIFETIME_TICKS,
             },
+            ServerProjectile,
             Replicate::to_clients(NetworkTarget::All),
-            Name::new("Player Projectile"),
+            Name::new("Server Projectile"),
         ));
     }
 }
 
 pub(crate) fn simulate_server_projectiles(
     mut commands: Commands,
-    mut projectiles: Query<(
-        Entity,
-        &PlayerProjectile,
-        &mut ProjectilePosition,
-        &mut ProjectileLifetime,
-    )>,
+    mut projectiles: Query<
+        (
+            Entity,
+            &PlayerProjectile,
+            &mut ProjectilePosition,
+            &mut ProjectileLifetime,
+        ),
+        With<ServerProjectile>,
+    >,
 ) {
     for (entity, projectile, mut position, mut lifetime) in &mut projectiles {
-        shared::move_projectile(&mut position, projectile);
+        projectile_shared::move_projectile(&mut position, projectile);
 
         lifetime.remaining_ticks = lifetime.remaining_ticks.saturating_sub(1);
 

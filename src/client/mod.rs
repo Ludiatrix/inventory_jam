@@ -5,7 +5,6 @@
 //! - applying inputs to the locally predicted player (for prediction to work, inputs have to be applied to both the
 //!   predicted entity and the server entity)
 pub mod player;
-mod projectile;
 mod systems;
 
 use bevy::prelude::*;
@@ -16,7 +15,7 @@ use systems::{
     write_cursor_aim_to_leafwing,
 };
 
-use crate::client::projectile::{initialize_projectile, simulate_client_projectiles};
+use crate::projectile::client::{initialize_projectile, simulate_client_projectiles};
 
 pub struct ExampleClientPlugin;
 
