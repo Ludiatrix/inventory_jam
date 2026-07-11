@@ -9,10 +9,7 @@ pub struct ExampleRendererPlugin;
 impl Plugin for ExampleRendererPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (init, setup_instructions));
-        app.add_systems(
-            Update,
-            (draw_test_world, draw_boxes, draw_projectiles, draw_aimstick),
-        );
+        app.add_systems(Update, (draw_test_world, draw_boxes, draw_projectiles));
     }
 }
 
@@ -76,17 +73,14 @@ fn setup_instructions(mut commands: Commands) {
     ));
 }
 
-use leafwing_input_manager::prelude::*;
-use lightyear::prelude::Predicted;
-
 const AIM_STICK_LENGTH: f32 = 50.0;
 
 pub(crate) fn draw_aimstick(
     mut gizmos: Gizmos,
-    players: Query<(&PlayerPosition, &ActionState<PlayerAction>), With<Predicted>>,
+    players: Query<(&PlayerPosition, &PlayerAimDirection)>,
 ) {
-    for (player_position, actions) in &players {
-        let direction = actions.axis_pair(&PlayerAction::Aim).normalize_or_zero();
+    for (player_position, aim_direction) in &players {
+        let direction = aim_direction.0.normalize_or_zero();
 
         if direction == Vec2::ZERO {
             continue;
@@ -96,7 +90,6 @@ pub(crate) fn draw_aimstick(
         let end = start + direction * AIM_STICK_LENGTH;
 
         gizmos.line_2d(start, end, Color::srgb(1.0, 0.85, 0.2));
-
         gizmos.circle_2d(
             Isometry2d::from_translation(end),
             5.0,

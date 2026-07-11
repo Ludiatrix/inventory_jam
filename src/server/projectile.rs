@@ -21,13 +21,17 @@ pub(crate) fn update_player_aim_direction(
     let is_host_server = !host_server.is_empty();
 
     for (actions, mut aim_direction, predicted) in &mut players {
-        // In host-client mode, do not run authoritative gameplay against the
-        // client's predicted copy.
         if is_host_server && predicted {
             continue;
         }
 
         let aim = actions.clamped_axis_pair(&PlayerAction::Aim);
+
+        info!(
+            ?aim,
+            current = ?aim_direction.0,
+            "SERVER inspected aim before projectile"
+        );
 
         if aim.length_squared() > 0.0001 {
             aim_direction.0 = aim.normalize_or_zero();
