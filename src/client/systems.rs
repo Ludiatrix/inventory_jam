@@ -4,9 +4,7 @@ use lightyear::prelude::*;
 
 use crate::{
     client::player::SmoothedAimDirection,
-    protocol::{
-        DebugServerMessage, PlayerAction, PlayerAimDirection, PlayerColor, PlayerId, PlayerPosition,
-    },
+    protocol::{DebugServerMessage, PlayerAction, PlayerColor, PlayerId, PlayerPosition},
     shared,
 };
 
@@ -103,29 +101,6 @@ pub(crate) fn handle_interpolated_spawn(
     }
 }
 
-pub(crate) fn update_cursor_aim(
-    window: Single<&Window, With<PrimaryWindow>>,
-    camera: Single<(&Camera, &GlobalTransform), With<Camera2d>>,
-    player: Single<(&PlayerPosition, &mut ActionState<PlayerAction>), With<Predicted>>,
-) {
-    let Some(cursor_position) = window.cursor_position() else {
-        return;
-    };
-
-    let (camera, camera_transform) = camera.into_inner();
-
-    let Ok(cursor_world_position) = camera.viewport_to_world_2d(camera_transform, cursor_position)
-    else {
-        return;
-    };
-
-    let (player_position, mut actions) = player.into_inner();
-
-    let direction = (cursor_world_position - player_position.0).normalize_or_zero();
-
-    actions.set_axis_pair(&PlayerAction::Aim, direction);
-}
-
 pub(crate) fn sample_cursor_aim(
     window: Single<&Window, With<PrimaryWindow>>,
     camera: Single<(&Camera, &GlobalTransform), With<Camera2d>>,
@@ -156,7 +131,7 @@ pub(crate) fn sample_cursor_aim(
 }
 
 pub(crate) fn write_cursor_aim_to_leafwing(
-    mut input_entity: Single<
+    input_entity: Single<
         (&CachedCursorAim, &mut ActionState<PlayerAction>),
         (With<Controlled>, With<InputMap<PlayerAction>>),
     >,

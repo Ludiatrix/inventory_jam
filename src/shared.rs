@@ -2,9 +2,7 @@ use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 use lightyear_examples_common::shared::SharedSettings;
 
-use crate::protocol::{
-    PlayerAction, PlayerPosition, PlayerProjectile, ProjectilePosition, ProtocolPlugin,
-};
+use crate::protocol::{PlayerAction, PlayerPosition, ProtocolPlugin};
 
 pub const WORLD_HALF_SIZE: Vec2 = Vec2::new(800.0, 600.0);
 pub const PLAYER_HALF_SIZE: f32 = 25.0;
@@ -61,8 +59,4 @@ pub(crate) fn shared_movement_behaviour(
 
         info!(?aim, ?aim_direction, "Aim");
     }
-}
-
-pub(crate) fn move_projectile(position: &mut ProjectilePosition, projectile: &PlayerProjectile) {
-    position.0 += projectile.direction * projectile.speed_per_tick;
 }

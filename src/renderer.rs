@@ -72,28 +72,3 @@ fn setup_instructions(mut commands: Commands) {
         },
     ));
 }
-
-const AIM_STICK_LENGTH: f32 = 50.0;
-
-pub(crate) fn draw_aimstick(
-    mut gizmos: Gizmos,
-    players: Query<(&PlayerPosition, &PlayerAimDirection)>,
-) {
-    for (player_position, aim_direction) in &players {
-        let direction = aim_direction.0.normalize_or_zero();
-
-        if direction == Vec2::ZERO {
-            continue;
-        }
-
-        let start = player_position.0;
-        let end = start + direction * AIM_STICK_LENGTH;
-
-        gizmos.line_2d(start, end, Color::srgb(1.0, 0.85, 0.2));
-        gizmos.circle_2d(
-            Isometry2d::from_translation(end),
-            5.0,
-            Color::srgb(1.0, 0.85, 0.2),
-        );
-    }
-}
