@@ -18,6 +18,7 @@ use lightyear_examples_common::shared::FIXED_TIMESTEP_HZ;
 
 #[cfg(feature = "client")]
 mod client;
+mod enemy;
 mod fragment;
 mod projectile;
 mod protocol;
@@ -40,6 +41,8 @@ fn main() {
     match cli.mode {
         #[cfg(feature = "client")]
         Some(Mode::Client { .. }) => {
+            use crate::enemy::EnemyClientPlugin;
+
             app.add_plugins((ExampleClientPlugin, fragment::FragmentClientPlugin));
         }
         #[cfg(feature = "server")]
@@ -48,6 +51,7 @@ fn main() {
         }
         #[cfg(all(feature = "client", feature = "server"))]
         Some(Mode::HostClient { .. }) => {
+            use crate::enemy::EnemyClientPlugin;
             app.add_plugins((
                 ExampleClientPlugin,
                 ExampleServerPlugin,

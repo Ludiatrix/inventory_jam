@@ -51,12 +51,4 @@ pub(crate) fn shared_movement_behaviour(
     if actions.just_pressed(&PlayerAction::UseSkill) {
         //info!("UseSkill Pressed!");
     }
-
-    let aim = actions.axis_pair(&PlayerAction::Aim);
-
-    if aim.length_squared() > f32::EPSILON {
-        let _aim_direction = aim.normalize();
-
-        //info!(?aim, ?aim_direction, "Aim");
-    }
 }

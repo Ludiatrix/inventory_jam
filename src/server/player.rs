@@ -86,12 +86,6 @@ pub(crate) fn update_player_aim_direction(
 
         let aim = actions.clamped_axis_pair(&PlayerAction::Aim);
 
-        /* info!(
-            ?aim,
-            current = ?aim_direction.0,
-            "SERVER inspected aim before projectile"
-        ); */
-
         if aim.length_squared() > 0.0001 {
             aim_direction.0 = aim.normalize_or_zero();
         }

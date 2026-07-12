@@ -84,23 +84,6 @@ pub(crate) fn handle_predicted_spawn(
     }
 }
 
-/// When the predicted copy of the client-owned entity is spawned, do stuff
-/// - assign it a different saturation
-/// - keep track of it in the Global resource
-#[allow(dead_code)]
-pub(crate) fn handle_interpolated_spawn(
-    trigger: On<Add, Interpolated>,
-    mut interpolated: Query<&mut PlayerColor>,
-) {
-    if let Ok(mut color) = interpolated.get_mut(trigger.entity) {
-        let hsva = Hsva {
-            saturation: 0.1,
-            ..Hsva::from(color.0)
-        };
-        color.0 = Color::from(hsva);
-    }
-}
-
 pub(crate) fn sample_cursor_aim(
     window: Single<&Window, With<PrimaryWindow>>,
     camera: Single<(&Camera, &GlobalTransform), With<Camera2d>>,
@@ -139,9 +122,4 @@ pub(crate) fn write_cursor_aim_to_leafwing(
     let (cached_aim, mut actions) = input_entity.into_inner();
 
     actions.set_axis_pair(&PlayerAction::Aim, cached_aim.0);
-
-    /* info!(
-        direction = ?cached_aim.0,
-        "CLIENT wrote cached aim to Leafwing"
-    ); */
 }
