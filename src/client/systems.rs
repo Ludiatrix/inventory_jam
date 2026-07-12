@@ -139,9 +139,4 @@ pub(crate) fn write_cursor_aim_to_leafwing(
     let (cached_aim, mut actions) = input_entity.into_inner();
 
     actions.set_axis_pair(&PlayerAction::Aim, cached_aim.0);
-
-    info!(
-        direction = ?cached_aim.0,
-        "CLIENT wrote cached aim to Leafwing"
-    );
 }

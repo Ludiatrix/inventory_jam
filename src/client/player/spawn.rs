@@ -7,7 +7,7 @@ use crate::protocol::messages::*;
 pub(crate) fn handle_interpolated_spawn(
     trigger: On<Add, Interpolated>,
     mut interpolated: Query<&mut PlayerColor>,
-) {
+) { 
     if let Ok(mut color) = interpolated.get_mut(trigger.entity) {
         let hsva = Hsva {
             saturation: 0.1,

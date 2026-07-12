@@ -6,6 +6,7 @@ use lightyear::prelude::*;
 use lightyear_examples_common::shared::SEND_INTERVAL;
 
 use crate::projectile::server::{fire_player_projectiles, simulate_server_projectiles};
+use crate::enemy::server::{spawn_enemy};
 use crate::protocol::messages::DebugServerMessage;
 use crate::protocol::*;
 use player::*;
@@ -26,6 +27,7 @@ impl Plugin for ExampleServerPlugin {
                 update_player_aim_direction,
                 fire_player_projectiles,
                 simulate_server_projectiles,
+                spawn_enemy
             )
                 .chain(),
         );
