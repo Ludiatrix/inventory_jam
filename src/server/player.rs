@@ -1,13 +1,13 @@
+use crate::protocol::player::PlayerBundle;
+use crate::protocol::rooms::{GameRoom, GameRooms};
+use crate::protocol::{PlayerAction, PlayerAimDirection, PlayerPosition};
+use crate::shared;
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 use lightyear::connection::client::Connected;
 use lightyear::connection::client_of::ClientOf;
 use lightyear::connection::host::HostServer;
 use lightyear::prelude::*;
-
-use crate::protocol::player::PlayerBundle;
-use crate::protocol::{PlayerAction, PlayerAimDirection, PlayerPosition};
-use crate::shared;
 
 pub(crate) fn handle_connected(
     trigger: On<Add, Connected>,
@@ -45,6 +45,7 @@ pub(crate) fn authoritative_player_movement(
     host_server: Query<(), With<HostServer>>,
     mut position_query: Query<(
         &mut PlayerPosition,
+        &GameRoom,
         &ActionState<PlayerAction>,
         Has<Predicted>,
     )>,
@@ -52,7 +53,7 @@ pub(crate) fn authoritative_player_movement(
     let is_host_server = !host_server.is_empty();
     let _tick = timeline.tick();
 
-    for (position, actions, predicted) in position_query.iter_mut() {
+    for (position, room, actions, predicted) in position_query.iter_mut() {
         if is_host_server && predicted {
             continue;
         }
@@ -65,7 +66,7 @@ pub(crate) fn authoritative_player_movement(
             //info!(tick = tick.0, "SERVER received Interact");
         }
 
-        shared::shared_movement_behaviour(position, actions);
+        shared::shared_movement_behaviour(position, room, actions);
     }
 }
 
@@ -88,6 +89,19 @@ pub(crate) fn update_player_aim_direction(
 
         if aim.length_squared() > 0.0001 {
             aim_direction.0 = aim.normalize_or_zero();
+        }
+    }
+}
+
+pub(crate) fn debug_switch_rooms(
+    mut player_query: Query<(&ActionState<PlayerAction>, &mut GameRoom)>,
+) {
+    for (actions, mut room) in &mut player_query {
+        if actions.just_pressed(&PlayerAction::DebugSwitchRooms) {
+            room.room = match room.room {
+                GameRooms::Arena => GameRooms::Pit,
+                GameRooms::Pit => GameRooms::Arena,
+            }
         }
     }
 }
