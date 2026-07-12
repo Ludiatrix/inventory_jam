@@ -22,6 +22,7 @@ pub(crate) fn handle_connected(
 
     let entity = commands
         .spawn((
+            Name::new("Player"),
             PlayerBundle::new(client_id, Vec2::ZERO),
             ActionState::<PlayerAction>::default(),
             Replicate::to_clients(NetworkTarget::All),

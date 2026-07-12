@@ -451,11 +451,14 @@ mod discovery {
             ));
             return;
         }
-        commands.spawn(PendingStatusRequest {
-            request_id,
-            remaining_polls: remaining_polls - 1,
-            timer: Timer::new(Duration::from_secs(POLL_INTERVAL_SECS), TimerMode::Once),
-        });
+        commands.spawn((
+            Name::new("Pending Status Request"),
+            PendingStatusRequest {
+                request_id,
+                remaining_polls: remaining_polls - 1,
+                timer: Timer::new(Duration::from_secs(POLL_INTERVAL_SECS), TimerMode::Once),
+            },
+        ));
     }
 
     /// Handles transport-level Edgegap request failures.

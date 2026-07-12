@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 use lightyear::prelude::*;
 
+use crate::protocol::rooms::GameRoom;
 use crate::{
     projectile::{
         protocol::PlayerProjectile,
@@ -15,7 +16,6 @@ use crate::{
         shared::{WeaponCooldown, weapon_stats},
     },
 };
-use crate::protocol::rooms::GameRoom;
 
 /// Gives every authoritative player a starter weapon.
 ///

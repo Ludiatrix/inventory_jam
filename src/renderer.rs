@@ -1,6 +1,6 @@
 use crate::enemy::render::draw_enemy_boxes;
+use crate::protocol::*;
 use crate::shared::{ARENA_WORLD_BOUNDS, SHOP_WORLD_BOUNDS};
-use crate::{protocol::*};
 use bevy::prelude::*;
 
 const GRID_SPACING: f32 = 100.0;
@@ -88,6 +88,7 @@ fn draw_test_world(gizmos: &mut Gizmos, bounds: Rect) {
 
 fn setup_instructions(mut commands: Commands) {
     commands.spawn((
+        Name::new("Input Control Instructions"),
         Text::new(
             "Move with WASD\nAim with Mouse\nHold Left Click to Fire\nN spawns an enemy (host/server debug)\nShift uses Skill",
         ),

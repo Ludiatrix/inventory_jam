@@ -177,11 +177,11 @@ pub fn spawn_connections(app: &mut App, mode: RunMode) {
                     deployment.internal_port
                 );
             }
-            app.world_mut().spawn(NetworkServer {
+            app.world_mut().spawn((Name::new("Network Server"), NetworkServer {
                 conditioner,
                 transport: server_transport(&config),
                 shared: SHARED_SETTINGS,
-            });
+            }));
             app.add_systems(Startup, start_server);
         }
     }
@@ -245,7 +245,7 @@ fn spawn_client(
     config: &NetworkingConfig,
     conditioner: Option<RecvLinkConditioner>,
 ) {
-    commands.spawn(NetworkClient {
+    commands.spawn((Name::new("Network Client"), NetworkClient {
         client_id,
         client_port: CLIENT_PORT,
         server_addr,
@@ -253,7 +253,7 @@ fn spawn_client(
         transport: client_transport(config),
         certificate_digest: config.certificate_digest.clone(),
         shared: SHARED_SETTINGS,
-    });
+    }));
 }
 
 #[cfg(feature = "client")]
