@@ -18,10 +18,11 @@ mod renderer;
 #[cfg(feature = "server")]
 mod server;
 mod shared;
+mod weapon;
 
 #[cfg(feature = "client")]
 use crate::client::ExampleClientPlugin;
-use crate::networking::{spawn_connections, RunMode, FIXED_TIMESTEP_HZ};
+use crate::networking::{FIXED_TIMESTEP_HZ, RunMode, spawn_connections};
 #[cfg(feature = "server")]
 use crate::server::ExampleServerPlugin;
 use crate::shared::SharedPlugin;
@@ -35,25 +36,48 @@ const HEADLESS_CLIENT_LOOP_HZ: f64 = 60.0;
 fn main() {
     let mode = run_mode();
     let mut app = build_app(mode, Duration::from_secs_f64(1.0 / FIXED_TIMESTEP_HZ));
-    app.add_plugins(SharedPlugin);
-    spawn_connections(&mut app, mode);
+
+    // Every replicated component must be registered identically before links
+    // and connections are spawned.
+    app.add_plugins((
+        SharedPlugin,
+        fragment::FragmentProtocolPlugin,
+        weapon::WeaponProtocolPlugin,
+    ));
 
     match mode {
         #[cfg(feature = "client")]
         RunMode::Client { .. } => {
             app.add_plugins((ExampleClientPlugin, fragment::FragmentClientPlugin));
+
+            #[cfg(feature = "gui")]
+            app.add_plugins((
+                renderer::ExampleRendererPlugin,
+                projectile::ProjectileRenderPlugin,
+                fragment::FragmentRenderPlugin,
+                weapon::WeaponRenderPlugin,
+            ));
         }
+
         #[cfg(feature = "server")]
         RunMode::Server => {
-            app.add_plugins((ExampleServerPlugin, fragment::FragmentServerPlugin));
+            app.add_plugins((
+                ExampleServerPlugin,
+                fragment::FragmentServerPlugin,
+                weapon::WeaponServerPlugin,
+            ));
+
+            #[cfg(feature = "gui")]
+            app.add_plugins((
+                renderer::ExampleRendererPlugin,
+                fragment::FragmentRenderPlugin,
+            ));
         }
     }
 
-    #[cfg(feature = "gui")]
-    app.add_plugins((
-        renderer::ExampleRendererPlugin,
-        fragment::FragmentRenderPlugin,
-    ));
+    // Protocol registration and observers must exist before link entities are
+    // created.
+    spawn_connections(&mut app, mode);
 
     app.run();
 }

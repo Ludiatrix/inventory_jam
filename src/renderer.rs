@@ -1,5 +1,5 @@
 use crate::enemy::render::draw_enemy_boxes;
-use crate::{projectile::render::draw_projectiles, protocol::*, shared};
+use crate::{protocol::*, shared};
 use bevy::prelude::*;
 
 const GRID_SPACING: f32 = 100.0;
@@ -13,12 +13,7 @@ impl Plugin for ExampleRendererPlugin {
 
         app.add_systems(
             Update,
-            (
-                draw_test_world,
-                draw_player_boxes,
-                draw_projectiles,
-                draw_enemy_boxes,
-            ),
+            (draw_test_world, draw_player_boxes, draw_enemy_boxes),
         );
     }
 }
@@ -26,8 +21,6 @@ fn init(mut commands: Commands) {
     commands.spawn(Camera2d);
 }
 
-/// System that draws the boxes of the player positions.
-/// The components should be replicated from the server to the client
 pub(crate) fn draw_player_boxes(
     mut gizmos: Gizmos,
     players: Query<(&PlayerPosition, &PlayerColor)>,
@@ -41,7 +34,6 @@ pub(crate) fn draw_player_boxes(
     }
 }
 
-/// Draws a simple top-down test arena with a grid and visible boundaries.
 fn draw_test_world(mut gizmos: Gizmos) {
     let half = shared::WORLD_HALF_SIZE;
     let grid_color = Color::srgba(0.35, 0.38, 0.42, 0.35);
@@ -75,7 +67,9 @@ fn draw_test_world(mut gizmos: Gizmos) {
 
 fn setup_instructions(mut commands: Commands) {
     commands.spawn((
-        Text::new("Move with WASD\n Aim with Mouse \n Fire with Left Click \n Shift to use Skill"),
+        Text::new(
+            "Move with WASD\nAim with Mouse\nHold Left Click to Fire\nN spawns an enemy (host/server debug)\nShift uses Skill",
+        ),
         Node {
             position_type: PositionType::Absolute,
             bottom: px(12),

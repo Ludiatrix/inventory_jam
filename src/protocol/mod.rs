@@ -10,8 +10,9 @@ pub use inputs::PlayerAction;
 pub use messages::DebugServerMessage;
 pub use player::{PlayerAimDirection, PlayerColor, PlayerId, PlayerPosition};
 
-pub use crate::projectile::protocol::PlayerProjectile;
+pub use crate::projectile::protocol::{PlayerProjectile, ProjectileImpact};
 pub use crate::projectile::shared::{ProjectileLifetime, ProjectilePosition};
+pub use crate::weapon::protocol::{EquippedWeapon, WeaponKind};
 
 #[derive(Clone)]
 pub struct ProtocolPlugin;
