@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
-use lightyear_examples_common::shared::SharedSettings;
 
 use crate::protocol::{PlayerAction, PlayerPosition, ProtocolPlugin};
 
@@ -30,11 +29,6 @@ impl Plugin for SharedPlugin {
         );
     }
 }
-
-pub const SHARED_SETTINGS: SharedSettings = SharedSettings {
-    protocol_id: 0,
-    private_key: [0; 32],
-};
 
 pub(crate) fn shared_movement_behaviour(
     mut position: Mut<PlayerPosition>,

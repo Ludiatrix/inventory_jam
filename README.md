@@ -3,33 +3,112 @@
 A simple example that shows how to use Lightyear to create a server-authoritative multiplayer game.
 
 It also showcases how to enable client-side prediction and snapshot interpolation:
-- For the client sending inputs: the pink cube is client-predicted (so inputs are used with no delay, and there is a rollback in case of mismatch with the server) and the red cube shows the received server state. (the server state arrives with some delay, and is a bit choppy since the replication rate is only 10Hz).
-- For the other clients: the red cube still shows the server states arriving at 10Hz, and the pink cube is a smooth interpolation between those states (there is a slight delay because we can only interpolate between 2 received server states).
+
+- For the client sending inputs: the pink cube is client-predicted (so inputs are used with no delay, and there is a
+  rollback in case of mismatch with the server) and the red cube shows the received server state. (the server state
+  arrives with some delay, and is a bit choppy since the replication rate is only 10Hz).
+- For the other clients: the red cube still shows the server states arriving at 10Hz, and the pink cube is a smooth
+  interpolation between those states (there is a slight delay because we can only interpolate between 2 received server
+  states).
 
 https://github.com/cBournhonesque/lightyear/assets/8112632/7b57d48a-d8b0-4cdd-a16f-f991a394c852
 
-## Running an example
+## Running locally
 
 - Run the server with a gui: `cargo run -- server`
-- Run client with id 1: `cargo run -- client -c 1`
-
-[//]: # (- Run the client and server in two separate bevy Apps: `cargo run` or `cargo run separate`)
+- Run client with id 1 (Edgegap): `cargo run -- client -c 1`
+- Run client against local server: `cargo run -- client -c 1 --dev`
 - Run the server without a gui: `cargo run --no-default-features --features=server -- server`
-- Run a headless client without a gui: `cargo run --no-default-features --features=client,netcode,webtransport -- client -c 1`
-- Run the client and server in "HostClient" mode, where the client also acts as server (both are in the same App) : `cargo run -- host-client -c 0`
+- Run a headless client without a gui:
+  `cargo run --no-default-features --features=client,netcode,webtransport -- client -c 1`
 
-You can control the behaviour of the example by changing the list of features. By default, all features are enabled (client, server, gui).
-For example you can run the server in headless mode (without gui) by running `cargo run --no-default-features --features=server,webtransport,netcode`.
+You can control the behaviour of the example by changing the list of features. By default, all features are enabled (
+client, server, gui).
+For example you can run the server in headless mode (without gui) by running
+`cargo run --no-default-features --features=server,webtransport,netcode`.
 
-For automated headless verification, you can set `LIGHTYEAR_SIMPLE_BOX_AUTOMOVE=right` on one client and
-`LIGHTYEAR_SIMPLE_BOX_LOG_POSITIONS=1` on another client to confirm from logs that the interpolated remote player
-keeps receiving `PlayerPosition` updates.
+### Client configuration
+
+Hardcoded client settings live in [`src/networking/`](src/networking/):
+
+- `CERT_DIGEST` in `setup.rs` — WebTransport certificate fingerprint
+- `--dev` on the client — connect with local UDP to `127.0.0.1:5888` instead of Edgegap
+- Edgegap API token and app name/version in `edgegap.rs`
+
+Then run the client normally:
+
+```powershell
+cargo run -- client -c 1
+```
+
+## Edgegap dedicated servers
+
+The dedicated server image runs headless with WebTransport and reads Edgegap injected variables at runtime:
+
+- `ARBITRIUM_PORT_GAMEPORT_INTERNAL` — bind port inside the container
+- `ARBITRIUM_PUBLIC_IP` / `ARBITRIUM_PORT_GAMEPORT_EXTERNAL` — public connection details
+- `ARBITRIUM_REQUEST_ID` — deployment id (`{request_id}.pr.edgegap.net`)
+
+Configure your Edgegap app version with a `gameport` mapped to the internal listen port (default `5888`) and protocol
+`UDP` (WebTransport/QUIC).
+
+### Direct Edgegap discovery
+
+On startup, clients call the Edgegap API directly:
+
+1. `GET /v1/deployments` — find a running `inventory-jam@dev` deployment
+2. If none is available, `POST /v2/deployments` — start a new deployment near Portland, OR
+3. Poll `GET /v1/status/{request_id}` until `running == true`
+4. Connect with WebTransport to the returned `gameport` endpoint
+
+### Deploy script
+
+Edit the hardcoded values at the top of [`scripts/deploy-edgegap.ps1`](scripts/deploy-edgegap.ps1) (`$AppName`,
+`$AppVersion`, `$Registry`, `$ApiToken`, registry credentials, etc.), then run:
+
+```powershell
+.\scripts\deploy-edgegap.ps1
+```
+
+Flow:
+
+1. Build and push the Docker image with a unique `dev-<timestamp>` tag
+2. Create the app version if missing, otherwise `PATCH` the existing version's image reference
+3. Stop any active deployments, then `POST /v2/deployments` near Portland, OR
+4. Poll until the deployment is ready
+
+Flags: `-SkipBuild`, `-SkipPush`, `-SkipVersionUpdate`, `-SkipDeploy`, `-ImageTag <tag>`. If you skip build or push, pass
+`-ImageTag` explicitly so the script does not point Edgegap at an unbuilt tag.
+
+### Local container smoke test
+
+```powershell
+docker build -t inventory-jam-server .
+docker run --rm -p 5888:5888/udp `
+  -e ARBITRIUM_REQUEST_ID=localtest `
+  -e ARBITRIUM_PUBLIC_IP=127.0.0.1 `
+  -e ARBITRIUM_PORT_GAMEPORT_INTERNAL=5888 `
+  -e ARBITRIUM_PORT_GAMEPORT_EXTERNAL=5888 `
+  inventory-jam-server
+```
 
 ### Testing in wasm with webtransport
 
-NOTE: I am using the [bevy cli](https://github.com/TheBevyFlock/bevy_cli) to build and serve the wasm example.
+```powershell
+trunk serve
+```
 
-To test the example in wasm, you can run the following commands: `bevy run web`
+Open http://127.0.0.1:8080/. Trunk builds with `client,gui,netcode,webtransport` (no server).
 
-The repo includes a pre-generated self-signed WebTransport certificate and digest, so `certificates/generate.sh` is not required for the usual local workflow while that certificate is valid. If it expires, or if you want to replace it, generate a new temporary self-signed certificate with:
-- `cd "$(git rev-parse --show-toplevel)" && sh certificates/generate.sh` (writes `certificates/cert.pem`, `certificates/key.pem`, and `certificates/digest.txt`; rebuild wasm clients after regenerating so they embed the new digest)
+If `trunk` fails with an invalid `--no-color` value, clear `NO_COLOR` first:
+
+```powershell
+$env:NO_COLOR = $null
+trunk serve
+```
+
+Firefox currently needs a local `xwt-web` patch that avoids BYOB readers for WebTransport datagrams. Background:
+[Mozilla bug 2007755](https://bugzilla.mozilla.org/show_bug.cgi?id=2007755) and
+[MOZGIII/xwt issue 156](https://github.com/MOZGIII/xwt/issues/156).
+
+Native and wasm clients use the same async Edgegap discovery path before connecting.

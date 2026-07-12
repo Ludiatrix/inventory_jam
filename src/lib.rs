@@ -15,3 +15,5 @@ pub mod weapon;
 pub mod renderer;
 
 pub mod shared;
+
+pub mod networking;

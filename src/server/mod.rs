@@ -3,10 +3,11 @@ mod player;
 use bevy::prelude::*;
 use lightyear::prelude::server::*;
 use lightyear::prelude::*;
-use lightyear_examples_common::shared::SEND_INTERVAL;
 
 use crate::enemy::server::spawn_enemy;
+use crate::networking::SEND_INTERVAL;
 use crate::projectile::server::{expire_server_impacts, simulate_server_projectiles};
+use crate::projectile::shared::projectile_collision_system;
 use crate::protocol::messages::DebugServerMessage;
 use crate::protocol::*;
 use crate::shared::FixedGameplaySet;
@@ -31,6 +32,7 @@ impl Plugin for ExampleServerPlugin {
         app.add_systems(
             FixedUpdate,
             (simulate_server_projectiles, expire_server_impacts)
+                projectile_collision_system,
                 .chain()
                 .in_set(FixedGameplaySet::ProjectileSimulation),
         );

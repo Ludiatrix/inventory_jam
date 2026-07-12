@@ -1,5 +1,18 @@
+use std::collections::{HashMap, HashSet};
+
 use bevy::prelude::*;
 
+use crate::{
+    enemy::protocol::{ENEMY_HALF_SIZE, ENEMY_SIZE, EnemyPosition},
+    projectile::protocol::PlayerProjectile,
+};
+
+pub const PROJECTILE_SPEED_PER_TICK: f32 = 20.0;
+pub const PROJECTILE_LIFETIME_TICKS: u16 = 90;
+pub const PROJECTILE_RADIUS: f32 = 8.0;
+pub const PROJECTILE_SPAWN_OFFSET: f32 = 25.0 + PROJECTILE_RADIUS + 2.0;
+
+const COLLISION_CELL_SIZE: f32 = ENEMY_SIZE;
 use crate::projectile::protocol::PlayerProjectile;
 
 #[derive(Component, Clone, Copy, Debug, PartialEq, Deref, DerefMut)]
