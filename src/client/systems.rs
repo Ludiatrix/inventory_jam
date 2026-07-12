@@ -51,8 +51,8 @@ pub(crate) fn update_camera(
 
 /// System to receive messages on the client
 pub(crate) fn receive_message1(mut receiver: Single<&mut MessageReceiver<DebugServerMessage>>) {
-    for message in receiver.receive() {
-        info!("Received message: {:?}", message);
+    for _message in receiver.receive() {
+        //info!("Received message: {:?}", message);
     }
 }
 

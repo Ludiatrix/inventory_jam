@@ -10,10 +10,10 @@ pub struct ExampleRendererPlugin;
 impl Plugin for ExampleRendererPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (init, setup_instructions));
+
         app.add_systems(Update, (draw_test_world, draw_player_boxes, draw_projectiles, draw_enemy_boxes));
     }
 }
-
 fn init(mut commands: Commands) {
     commands.spawn(Camera2d);
 }

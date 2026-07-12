@@ -41,14 +41,14 @@ pub(crate) fn shared_movement_behaviour(
     }
 
     if actions.just_pressed(&PlayerAction::Fire) {
-        info!("Fire Pressed!");
+        //info!("Fire Pressed!");
     }
 
     if actions.just_pressed(&PlayerAction::Interact) {
-        info!("Interact Pressed!");
+        //info!("Interact Pressed!");
     }
 
     if actions.just_pressed(&PlayerAction::UseSkill) {
-        info!("UseSkill Pressed!");
+        //info!("UseSkill Pressed!");
     }
 }

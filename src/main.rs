@@ -1,12 +1,7 @@
-//! This example showcases how to use Lightyear with Bevy, to easily get replication along with prediction/interpolation working.
-//!
-//! There is a lot of setup code, but it's mostly to have the examples work in all possible configurations of transport.
-//! (all transports are supported, as well as running the example in client-and-server or host-server mode)
-//!
-//!
-//! Run with
+//! Run with:
 //! - `cargo run -- server`
 //! - `cargo run -- client -c 1`
+
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 #![allow(dead_code)]
@@ -18,12 +13,12 @@ use crate::server::ExampleServerPlugin;
 use crate::shared::SharedPlugin;
 use bevy::prelude::*;
 use core::time::Duration;
-use lightyear_examples_common::cli::{Cli, Mode};
-
+use lightyear_examples_common::cli::Mode;
 use lightyear_examples_common::shared::FIXED_TIMESTEP_HZ;
 
 #[cfg(feature = "client")]
 mod client;
+mod fragment;
 mod projectile;
 mod enemy;
 mod protocol;
@@ -33,40 +28,51 @@ mod renderer;
 mod server;
 mod shared;
 
-/// When running the example as a binary, we only support Client or Server mode.
 fn main() {
-    let cli = Cli::default();
+    // Parse `server`, `client -c 1`, and other command-line modes.
+    let cli = lightyear_examples_common::cli::cli();
 
     let mut app = cli.build_app(Duration::from_secs_f64(1.0 / FIXED_TIMESTEP_HZ), true);
 
-    app.add_plugins(SharedPlugin);
-
-    cli.spawn_connections(&mut app);
+    // Protocol registration must be identical and installed before connections
+    // are spawned on both client and server runtimes.
+    app.add_plugins((SharedPlugin, fragment::FragmentProtocolPlugin));
 
     match cli.mode {
         #[cfg(feature = "client")]
         Some(Mode::Client { .. }) => {
             use crate::enemy::EnemyClientPlugin;
 
-            app.add_plugins(ExampleClientPlugin);
+            app.add_plugins((ExampleClientPlugin, fragment::FragmentClientPlugin));
             app.add_plugins(EnemyClientPlugin);
         }
         #[cfg(feature = "server")]
         Some(Mode::Server) => {
-            app.add_plugins(ExampleServerPlugin);
+            app.add_plugins((ExampleServerPlugin, fragment::FragmentServerPlugin));
         }
         #[cfg(all(feature = "client", feature = "server"))]
-        Some(Mode::HostClient { client_id }) => {
+        Some(Mode::HostClient { .. }) => {
             use crate::enemy::EnemyClientPlugin;
-            app.add_plugins(ExampleClientPlugin);
-            app.add_plugins(ExampleServerPlugin);
+            app.add_plugins((
+                ExampleClientPlugin,
+                ExampleServerPlugin,
+                fragment::FragmentClientPlugin,
+                fragment::FragmentServerPlugin,
+            ));
             app.add_plugins(EnemyClientPlugin);
         }
         _ => {}
     }
 
     #[cfg(feature = "gui")]
-    app.add_plugins(renderer::ExampleRendererPlugin);
+    app.add_plugins((
+        renderer::ExampleRendererPlugin,
+        fragment::FragmentRenderPlugin,
+    ));
+
+    // Observers and protocol registrations are now present before the link
+    // entities are created.
+    cli.spawn_connections(&mut app);
 
     app.run();
 }
