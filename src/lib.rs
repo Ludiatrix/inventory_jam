@@ -9,6 +9,8 @@ pub mod server;
 pub mod enemy;
 pub mod fragment;
 pub mod projectile;
+pub mod weapon;
+
 #[cfg(feature = "gui")]
 pub mod renderer;
 

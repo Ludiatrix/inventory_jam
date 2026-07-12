@@ -1,9 +1,6 @@
 //! The client plugin.
-//! The client will be responsible for:
-//! - connecting to the server at Startup
-//! - sending inputs to the server
-//! - applying inputs to the locally predicted player (for prediction to work, inputs have to be applied to both the
-//!   predicted entity and the server entity)
+//! The client sends inputs, predicts its controlled player, and locally
+//! simulates replicated projectile presentation.
 pub mod player;
 mod systems;
 
@@ -15,7 +12,9 @@ use systems::{
     write_cursor_aim_to_leafwing,
 };
 
-use crate::projectile::client::{initialize_projectile, simulate_client_projectiles};
+use crate::projectile::client::{
+    initialize_projectile, initialize_projectile_impact, simulate_client_projectiles,
+};
 
 pub struct ExampleClientPlugin;
 
@@ -46,5 +45,6 @@ impl Plugin for ExampleClientPlugin {
         app.add_observer(handle_controlled_spawn);
         app.add_observer(handle_interpolated_spawn);
         app.add_observer(initialize_projectile);
+        app.add_observer(initialize_projectile_impact);
     }
 }
