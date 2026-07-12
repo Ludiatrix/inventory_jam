@@ -26,6 +26,7 @@ pub(crate) fn initialize_projectile(
     }
 
     commands.entity(entity).insert((
+        Name::new(format!("Projectile: {}", projectile.owner)),
         ProjectilePosition(projectile.origin),
         ProjectileLifetime::from_projectile(projectile),
         ClientProjectileVisual,
@@ -47,9 +48,11 @@ pub(crate) fn initialize_projectile_impact(
         return;
     }
 
-    commands
-        .entity(entity)
-        .insert((ImpactPosition(impact.position), ClientImpactVisual));
+    commands.entity(entity).insert((
+        Name::new("Projectile Impact"),
+        ImpactPosition(impact.position),
+        ClientImpactVisual,
+    ));
 }
 
 pub(crate) fn simulate_client_projectiles(
