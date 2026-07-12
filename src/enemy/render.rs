@@ -5,7 +5,7 @@ use bevy::{
     math::{Isometry2d, Vec2},
 };
 
-use crate::enemy::protocol::{ENEMY_SIZE, {EnemyHealth, EnemyPosition}};
+use crate::enemy::protocol::{EnemyHealth, EnemyPosition, ENEMY_SIZE};
 
 pub(crate) fn draw_enemy_boxes(mut gizmos: Gizmos, enemies: Query<(&EnemyPosition, &EnemyHealth)>) {
     for (position, health) in &enemies {
