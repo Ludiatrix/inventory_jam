@@ -22,7 +22,7 @@ mod weapon;
 
 #[cfg(feature = "client")]
 use crate::client::ExampleClientPlugin;
-use crate::networking::{spawn_connections, RunMode, FIXED_TIMESTEP_HZ};
+use crate::networking::{FIXED_TIMESTEP_HZ, RunMode, spawn_connections};
 #[cfg(feature = "server")]
 use crate::server::ExampleServerPlugin;
 use crate::shared::SharedPlugin;
