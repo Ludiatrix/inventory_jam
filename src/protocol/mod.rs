@@ -23,5 +23,6 @@ impl Plugin for ProtocolPlugin {
         inputs::register(app);
         player::register(app);
         crate::projectile::protocol::register(app);
+        crate::enemy::protocol::register(app);
     }
 }

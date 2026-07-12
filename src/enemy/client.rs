@@ -14,6 +14,11 @@ pub(crate) fn initialize_enemy(
         "Incoming enemy entity {:?} ",
         entity
     );
+    
+    info!(
+        "Incoming enemies {:?} ",
+        enemies
+    );
 
     let Ok(enemy) = enemies.get(entity) else {
         return;

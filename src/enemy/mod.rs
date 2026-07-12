@@ -21,7 +21,7 @@ pub struct EnemyClientPlugin;
 #[cfg(feature = "client")]
 impl Plugin for EnemyClientPlugin {
     fn build(&self, app: &mut App) {
-        app.add_observer(client::initialize_enemy);
+        // app.add_observer(client::initialize_enemy);
         // app.add_systems(FixedUpdate, client::simulate_client_fragments);
     }
 }

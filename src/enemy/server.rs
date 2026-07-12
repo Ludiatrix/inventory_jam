@@ -12,7 +12,6 @@ pub(crate) fn spawn_enemy(
         let entity = commands.spawn((
             EnemyPosition(Vec2::ZERO),
             Replicate::to_clients(NetworkTarget::All),
-            PredictionTarget::to_clients(NetworkTarget::All),
             InterpolationTarget::to_clients(NetworkTarget::All),
             Name::new("Enemy"),
         ))

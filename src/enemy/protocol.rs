@@ -17,6 +17,5 @@ impl Ease for EnemyPosition {
 pub fn register(app: &mut App) {
     app.component::<EnemyPosition>()
         .replicate()
-        .predict()
         .add_linear_interpolation();
 }
