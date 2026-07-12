@@ -13,3 +13,5 @@ pub mod projectile;
 pub mod renderer;
 
 pub mod shared;
+
+pub mod networking;

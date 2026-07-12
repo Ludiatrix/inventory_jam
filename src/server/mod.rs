@@ -3,9 +3,9 @@ mod player;
 use bevy::prelude::*;
 use lightyear::prelude::server::*;
 use lightyear::prelude::*;
-use lightyear_examples_common::shared::SEND_INTERVAL;
 
 use crate::enemy::server::spawn_enemy;
+use crate::networking::SEND_INTERVAL;
 use crate::projectile::server::{fire_player_projectiles, simulate_server_projectiles};
 use crate::projectile::shared::projectile_collision_system;
 use crate::protocol::messages::DebugServerMessage;
