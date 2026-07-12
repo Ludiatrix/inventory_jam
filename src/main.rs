@@ -18,9 +18,9 @@ use lightyear_examples_common::shared::FIXED_TIMESTEP_HZ;
 
 #[cfg(feature = "client")]
 mod client;
+mod enemy;
 mod fragment;
 mod projectile;
-mod enemy;
 mod protocol;
 #[cfg(feature = "gui")]
 mod renderer;
@@ -44,7 +44,6 @@ fn main() {
             use crate::enemy::EnemyClientPlugin;
 
             app.add_plugins((ExampleClientPlugin, fragment::FragmentClientPlugin));
-            app.add_plugins(EnemyClientPlugin);
         }
         #[cfg(feature = "server")]
         Some(Mode::Server) => {
@@ -59,7 +58,6 @@ fn main() {
                 fragment::FragmentClientPlugin,
                 fragment::FragmentServerPlugin,
             ));
-            app.add_plugins(EnemyClientPlugin);
         }
         _ => {}
     }

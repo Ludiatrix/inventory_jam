@@ -18,7 +18,7 @@ pub(crate) fn initialize_projectile(
     let Ok((projectile, server_projectile)) = projectiles.get(entity) else {
         return;
     };
-    
+
     // In host-client mode, do not let the client visual system claim the server-owned projectile.
     if server_projectile.is_some() {
         return;
