@@ -1,15 +1,42 @@
-use crate::app::validate_username;
+use crate::app::{AppState, validate_username};
+use crate::player::protocol::{PlayerAimDirection, PlayerBundle, PlayerPosition, PlayerUsername};
 use crate::protocol::inputs::PlayerAction;
 use crate::protocol::messages::SetUsername;
-use crate::protocol::player::{PlayerAimDirection, PlayerBundle, PlayerPosition, PlayerUsername};
 use crate::protocol::rooms::{GameRoom, GameRooms};
 use crate::shared;
+use crate::shared::FixedGameplaySet;
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 use lightyear::connection::client::Connected;
 use lightyear::connection::client_of::ClientOf;
 use lightyear::connection::host::HostServer;
 use lightyear::prelude::*;
+
+pub struct PlayerServerPlugin;
+
+impl Plugin for PlayerServerPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_observer(handle_connected);
+
+        app.add_systems(
+            FixedUpdate,
+            (authoritative_player_movement, update_player_aim_direction)
+                .chain()
+                .in_set(FixedGameplaySet::PlayerSimulation)
+                .run_if(in_state(AppState::Hosting)),
+        );
+
+        app.add_systems(
+            FixedUpdate,
+            debug_switch_rooms.run_if(in_state(AppState::Hosting)),
+        );
+
+        app.add_systems(
+            Update,
+            apply_username_messages.run_if(in_state(AppState::Hosting)),
+        );
+    }
+}
 
 pub(crate) fn handle_connected(
     trigger: On<Add, Connected>,

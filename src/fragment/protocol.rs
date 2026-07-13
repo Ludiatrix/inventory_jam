@@ -2,6 +2,16 @@ use bevy::prelude::*;
 use lightyear::prelude::*;
 use serde::{Deserialize, Serialize};
 
+/// Installs network component registration on every peer.
+pub struct FragmentProtocolPlugin;
+
+impl Plugin for FragmentProtocolPlugin {
+    fn build(&self, app: &mut App) {
+        app.component::<Fragment>().replicate();
+        app.component::<CarriedFragments>().replicate();
+    }
+}
+
 /// Authoritative fragment data replicated from the server.
 ///
 /// `collector` becomes `Some` as soon as the server awards the fragment.
@@ -32,8 +42,3 @@ impl Fragment {
     Component, Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, Deref, DerefMut,
 )]
 pub struct CarriedFragments(pub u32);
-
-pub fn register(app: &mut App) {
-    app.component::<Fragment>().replicate();
-    app.component::<CarriedFragments>().replicate();
-}

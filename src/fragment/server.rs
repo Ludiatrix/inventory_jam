@@ -1,16 +1,16 @@
+use crate::app::AppState;
+use crate::fragment::api::SpawnFragmentPool;
+use crate::fragment::{
+    protocol::{CarriedFragments, Fragment},
+    shared::{self as fragment_shared, FragmentLifetime, FragmentPosition, ServerFragment},
+};
+use crate::player::{PlayerId, PlayerPosition};
+use crate::protocol::inputs::PlayerAction;
+use crate::protocol::rooms::GameRoom;
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 use lightyear::prelude::*;
 use rand::Rng;
-
-use crate::fragment::{
-    SpawnFragmentPool,
-    protocol::{CarriedFragments, Fragment},
-    shared::{self as fragment_shared, FragmentLifetime, FragmentPosition, ServerFragment},
-};
-use crate::protocol::inputs::PlayerAction;
-use crate::protocol::player::{PlayerId, PlayerPosition};
-use crate::protocol::rooms::GameRoom;
 
 const MIN_FRAGMENTS_PER_DEBUG_POOL: u16 = 50;
 const MAX_FRAGMENTS_PER_DEBUG_POOL: u16 = 150;
@@ -19,6 +19,27 @@ const MAX_FRAGMENTS_PER_DEBUG_POOL: u16 = 150;
 // debug pool does not disappear on the same tick that it spawns.
 const FRAGMENT_POOL_MIN_RADIUS: f32 = 50.0;
 const FRAGMENT_POOL_MAX_RADIUS: f32 = 200.0;
+
+/// Installs only server-authoritative fragment behavior.
+pub struct FragmentServerPlugin;
+
+impl Plugin for FragmentServerPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_message::<SpawnFragmentPool>();
+
+        app.add_systems(
+            FixedUpdate,
+            (
+                ensure_player_fragment_wallets,
+                request_debug_fragment_pool,
+                spawn_requested_fragment_pools,
+                simulate_server_fragments,
+            )
+                .chain()
+                .run_if(in_state(AppState::Hosting)),
+        );
+    }
+}
 
 /// Ensures every authoritative player has fragment currency state owned by this
 /// feature. Predicted host-client copies are deliberately ignored.

@@ -5,18 +5,17 @@ use bevy::window::PresentMode;
 #[cfg(feature = "gui")]
 use bevy::winit::WinitSettings;
 use inventory_jam::app::*;
-#[cfg(feature = "client")]
-use inventory_jam::client::ExampleClientPlugin;
-#[cfg(feature = "gui")]
-use inventory_jam::projectile;
-#[cfg(feature = "gui")]
-use inventory_jam::renderer;
+use inventory_jam::enemy::EnemyPlugin;
+use inventory_jam::fragment::FragmentPlugin;
+use inventory_jam::networking;
+use inventory_jam::player::PlayerPlugin;
+use inventory_jam::projectile::ProjectilePlugin;
 #[cfg(feature = "server")]
 use inventory_jam::server::ExampleServerPlugin;
 use inventory_jam::shared::SharedPlugin;
-#[cfg(feature = "gui")]
-use inventory_jam::ui::MenuPlugin;
-use inventory_jam::{fragment, networking, weapon};
+use inventory_jam::ui::UiPlugin;
+use inventory_jam::weapon::WeaponPlugin;
+use inventory_jam::world::WorldPlugin;
 use std::time::Duration;
 
 const TICK_DURATION: Duration =
@@ -41,35 +40,24 @@ fn main() {
         tick_duration: TICK_DURATION,
     });
 
+    app.insert_state(AppState::MainMenu);
+
     app.add_plugins((
+        WorldPlugin,
+        UiPlugin,
         LaunchPlugin,
         SharedPlugin,
-        fragment::FragmentProtocolPlugin,
-        weapon::WeaponProtocolPlugin,
+        PlayerPlugin,
+        EnemyPlugin,
+        ProjectilePlugin,
+        WeaponPlugin,
+        FragmentPlugin,
     ));
     networking::configure_networking(&mut app);
 
     #[cfg(feature = "server")]
     app.add_observer(networking::apply_server_link_conditioner)
-        .add_plugins((
-            ExampleServerPlugin,
-            fragment::FragmentServerPlugin,
-            weapon::WeaponServerPlugin,
-        ));
-
-    #[cfg(feature = "client")]
-    app.add_plugins((ExampleClientPlugin, fragment::FragmentClientPlugin));
-
-    app.insert_state(AppState::MainMenu);
-
-    #[cfg(feature = "gui")]
-    app.add_plugins((
-        renderer::ExampleRendererPlugin,
-        projectile::ProjectileRenderPlugin,
-        fragment::FragmentRenderPlugin,
-        weapon::WeaponRenderPlugin,
-        MenuPlugin,
-    ));
+        .add_plugins(ExampleServerPlugin);
 
     app.run();
 }
