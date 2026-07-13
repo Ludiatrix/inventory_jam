@@ -7,6 +7,7 @@ use bevy::winit::WinitSettings;
 use inventory_jam::app::*;
 #[cfg(feature = "client")]
 use inventory_jam::client::ExampleClientPlugin;
+use inventory_jam::enemy::{EnemyProtocolPlugin, EnemyRenderPlugin, EnemyServerPlugin};
 #[cfg(feature = "gui")]
 use inventory_jam::projectile;
 #[cfg(feature = "gui")]
@@ -44,6 +45,7 @@ fn main() {
     app.add_plugins((
         LaunchPlugin,
         SharedPlugin,
+        EnemyProtocolPlugin,
         fragment::FragmentProtocolPlugin,
         weapon::WeaponProtocolPlugin,
     ));
@@ -53,6 +55,7 @@ fn main() {
     app.add_observer(networking::apply_server_link_conditioner)
         .add_plugins((
             ExampleServerPlugin,
+            EnemyServerPlugin,
             fragment::FragmentServerPlugin,
             weapon::WeaponServerPlugin,
         ));
@@ -66,6 +69,7 @@ fn main() {
     app.add_plugins((
         renderer::ExampleRendererPlugin,
         projectile::ProjectileRenderPlugin,
+        EnemyRenderPlugin,
         fragment::FragmentRenderPlugin,
         weapon::WeaponRenderPlugin,
         MenuPlugin,

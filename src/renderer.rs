@@ -1,5 +1,4 @@
 use crate::app::{AppState, game_is_active};
-use crate::enemy::EnemyClientPlugin;
 use crate::protocol::player::{PlayerColor, PlayerPosition, PlayerUsername};
 use crate::shared::{ARENA_WORLD_BOUNDS, SHOP_WORLD_BOUNDS};
 use bevy::prelude::*;
@@ -16,8 +15,6 @@ impl Plugin for ExampleRendererPlugin {
         app.add_systems(Startup, init);
         app.add_systems(OnEnter(AppState::Playing), setup_instructions);
         app.add_systems(OnExit(AppState::Playing), cleanup_instructions);
-
-        app.add_plugins(EnemyClientPlugin);
 
         app.add_systems(
             Update,
