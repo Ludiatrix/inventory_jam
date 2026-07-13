@@ -15,7 +15,8 @@ use inventory_jam::server::ExampleServerPlugin;
 use inventory_jam::shared::SharedPlugin;
 #[cfg(feature = "gui")]
 use inventory_jam::ui::MenuPlugin;
-use inventory_jam::{fragment, networking, weapon};
+use inventory_jam::weapon::WeaponPlugin;
+use inventory_jam::{fragment, networking};
 use std::time::Duration;
 
 const TICK_DURATION: Duration =
@@ -46,23 +47,19 @@ fn main() {
         PlayerPlugin,
         EnemyPlugin,
         ProjectilePlugin,
+        WeaponPlugin,
         fragment::FragmentPlugin,
-        weapon::WeaponProtocolPlugin,
     ));
     networking::configure_networking(&mut app);
 
     #[cfg(feature = "server")]
     app.add_observer(networking::apply_server_link_conditioner)
-        .add_plugins((ExampleServerPlugin, weapon::WeaponServerPlugin));
+        .add_plugins(ExampleServerPlugin);
 
     app.insert_state(AppState::MainMenu);
 
     #[cfg(feature = "gui")]
-    app.add_plugins((
-        renderer::ExampleRendererPlugin,
-        weapon::WeaponRenderPlugin,
-        MenuPlugin,
-    ));
+    app.add_plugins((renderer::ExampleRendererPlugin, MenuPlugin));
 
     app.run();
 }
