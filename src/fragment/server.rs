@@ -14,7 +14,7 @@ use crate::{
 };
 
 const MIN_FRAGMENTS_PER_DEBUG_POOL: u16 = 50;
-const MAX_FRAGMENTS_PER_DEBUG_POOL: u16 = 15000;
+const MAX_FRAGMENTS_PER_DEBUG_POOL: u16 = 150;
 
 // The minimum is deliberately larger than the normal collection radius so a
 // debug pool does not disappear on the same tick that it spawns.
@@ -187,8 +187,8 @@ pub(crate) fn simulate_server_fragments(
 }
 
 fn simulate_collected_fragment(
-    _commands: &mut Commands,
-    _fragment_entity: Entity,
+    commands: &mut Commands,
+    fragment_entity: Entity,
     collector: PeerId,
     position: &mut FragmentPosition,
     players: &Query<(Entity, &PlayerId, &PlayerPosition, Has<Predicted>)>,
@@ -196,6 +196,11 @@ fn simulate_collected_fragment(
 ) {
     if let Some(target) = player_position_by_id(collector, players, is_host_server) {
         fragment_shared::pull_fragment_toward(position, target);
+        if position.0.distance_squared(target)
+            <= fragment_shared::FRAGMENT_RADIUS * fragment_shared::FRAGMENT_RADIUS
+        {
+            commands.entity(fragment_entity).despawn();
+        }
     }
 }
 
