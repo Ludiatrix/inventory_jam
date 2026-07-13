@@ -8,10 +8,21 @@ mod render;
 mod server;
 mod shared;
 
-#[cfg(feature = "client")]
-pub use client::FragmentClientPlugin;
-pub use protocol::FragmentProtocolPlugin;
-#[cfg(feature = "gui")]
-pub use render::FragmentRenderPlugin;
-#[cfg(feature = "server")]
-pub use server::FragmentServerPlugin;
+use bevy::app::{App, Plugin};
+
+pub struct FragmentPlugin;
+
+impl Plugin for FragmentPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(protocol::FragmentProtocolPlugin);
+
+        #[cfg(feature = "client")]
+        app.add_plugins(client::FragmentClientPlugin);
+
+        #[cfg(feature = "server")]
+        app.add_plugins(server::FragmentServerPlugin);
+
+        #[cfg(feature = "gui")]
+        app.add_plugins(render::FragmentRenderPlugin);
+    }
+}

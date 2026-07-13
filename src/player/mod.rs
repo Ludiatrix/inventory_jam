@@ -6,10 +6,21 @@ mod render;
 #[cfg(feature = "server")]
 mod server;
 
-#[cfg(feature = "client")]
-pub use client::PlayerClientPlugin;
-pub use protocol::PlayerProtocolPlugin;
-#[cfg(feature = "gui")]
-pub use render::PlayerRenderPlugin;
-#[cfg(feature = "server")]
-pub use server::PlayerServerPlugin;
+use bevy::app::{App, Plugin};
+
+pub struct PlayerPlugin;
+
+impl Plugin for PlayerPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(protocol::PlayerProtocolPlugin);
+
+        #[cfg(feature = "client")]
+        app.add_plugins(client::PlayerClientPlugin);
+
+        #[cfg(feature = "server")]
+        app.add_plugins(server::PlayerServerPlugin);
+
+        #[cfg(feature = "gui")]
+        app.add_plugins(render::PlayerRenderPlugin);
+    }
+}

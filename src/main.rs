@@ -5,14 +5,9 @@ use bevy::window::PresentMode;
 #[cfg(feature = "gui")]
 use bevy::winit::WinitSettings;
 use inventory_jam::app::*;
-use inventory_jam::enemy::{EnemyProtocolPlugin, EnemyRenderPlugin, EnemyServerPlugin};
-use inventory_jam::player::{
-    PlayerClientPlugin, PlayerProtocolPlugin, PlayerRenderPlugin, PlayerServerPlugin,
-};
-use inventory_jam::projectile::{
-    ProjectileClientPlugin, ProjectileProtocolPlugin, ProjectileRenderPlugin,
-    ProjectileServerPlugin,
-};
+use inventory_jam::enemy::EnemyPlugin;
+use inventory_jam::player::PlayerPlugin;
+use inventory_jam::projectile::ProjectilePlugin;
 #[cfg(feature = "gui")]
 use inventory_jam::renderer;
 #[cfg(feature = "server")]
@@ -48,41 +43,23 @@ fn main() {
     app.add_plugins((
         LaunchPlugin,
         SharedPlugin,
-        PlayerProtocolPlugin,
-        EnemyProtocolPlugin,
-        ProjectileProtocolPlugin,
-        fragment::FragmentProtocolPlugin,
+        PlayerPlugin,
+        EnemyPlugin,
+        ProjectilePlugin,
+        fragment::FragmentPlugin,
         weapon::WeaponProtocolPlugin,
     ));
     networking::configure_networking(&mut app);
 
     #[cfg(feature = "server")]
     app.add_observer(networking::apply_server_link_conditioner)
-        .add_plugins((
-            ExampleServerPlugin,
-            PlayerServerPlugin,
-            EnemyServerPlugin,
-            ProjectileServerPlugin,
-            fragment::FragmentServerPlugin,
-            weapon::WeaponServerPlugin,
-        ));
-
-    #[cfg(feature = "client")]
-    app.add_plugins((
-        ProjectileClientPlugin,
-        fragment::FragmentClientPlugin,
-        PlayerClientPlugin,
-    ));
+        .add_plugins((ExampleServerPlugin, weapon::WeaponServerPlugin));
 
     app.insert_state(AppState::MainMenu);
 
     #[cfg(feature = "gui")]
     app.add_plugins((
         renderer::ExampleRendererPlugin,
-        ProjectileRenderPlugin,
-        PlayerRenderPlugin,
-        EnemyRenderPlugin,
-        fragment::FragmentRenderPlugin,
         weapon::WeaponRenderPlugin,
         MenuPlugin,
     ));
