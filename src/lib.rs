@@ -1,9 +1,6 @@
 pub mod app;
 pub mod protocol;
 
-#[cfg(feature = "client")]
-pub mod client;
-
 #[cfg(feature = "server")]
 pub mod server;
 
@@ -20,3 +17,4 @@ pub mod ui;
 pub mod shared;
 
 pub mod networking;
+pub mod player;

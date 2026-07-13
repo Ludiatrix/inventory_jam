@@ -5,10 +5,14 @@ use bevy::window::PresentMode;
 #[cfg(feature = "gui")]
 use bevy::winit::WinitSettings;
 use inventory_jam::app::*;
-#[cfg(feature = "client")]
-use inventory_jam::client::ExampleClientPlugin;
 use inventory_jam::enemy::{EnemyProtocolPlugin, EnemyRenderPlugin, EnemyServerPlugin};
-use inventory_jam::projectile::{ProjectileClientPlugin, ProjectileProtocolPlugin, ProjectileRenderPlugin, ProjectileServerPlugin};
+use inventory_jam::player::{
+    PlayerClientPlugin, PlayerProtocolPlugin, PlayerRenderPlugin, PlayerServerPlugin,
+};
+use inventory_jam::projectile::{
+    ProjectileClientPlugin, ProjectileProtocolPlugin, ProjectileRenderPlugin,
+    ProjectileServerPlugin,
+};
 #[cfg(feature = "gui")]
 use inventory_jam::renderer;
 #[cfg(feature = "server")]
@@ -44,6 +48,7 @@ fn main() {
     app.add_plugins((
         LaunchPlugin,
         SharedPlugin,
+        PlayerProtocolPlugin,
         EnemyProtocolPlugin,
         ProjectileProtocolPlugin,
         fragment::FragmentProtocolPlugin,
@@ -55,6 +60,7 @@ fn main() {
     app.add_observer(networking::apply_server_link_conditioner)
         .add_plugins((
             ExampleServerPlugin,
+            PlayerServerPlugin,
             EnemyServerPlugin,
             ProjectileServerPlugin,
             fragment::FragmentServerPlugin,
@@ -63,9 +69,9 @@ fn main() {
 
     #[cfg(feature = "client")]
     app.add_plugins((
-        ExampleClientPlugin,
         ProjectileClientPlugin,
         fragment::FragmentClientPlugin,
+        PlayerClientPlugin,
     ));
 
     app.insert_state(AppState::MainMenu);
@@ -74,6 +80,7 @@ fn main() {
     app.add_plugins((
         renderer::ExampleRendererPlugin,
         ProjectileRenderPlugin,
+        PlayerRenderPlugin,
         EnemyRenderPlugin,
         fragment::FragmentRenderPlugin,
         weapon::WeaponRenderPlugin,
