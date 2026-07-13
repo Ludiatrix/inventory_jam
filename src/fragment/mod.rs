@@ -1,3 +1,4 @@
+use crate::app::{AppState, game_is_active};
 use bevy::prelude::*;
 
 pub mod api;
@@ -34,7 +35,10 @@ pub struct FragmentClientPlugin;
 impl Plugin for FragmentClientPlugin {
     fn build(&self, app: &mut App) {
         app.add_observer(client::initialize_fragment);
-        app.add_systems(FixedUpdate, client::simulate_client_fragments);
+        app.add_systems(
+            FixedUpdate,
+            client::simulate_client_fragments.run_if(in_state(AppState::Playing)),
+        );
     }
 }
 
@@ -55,7 +59,8 @@ impl Plugin for FragmentServerPlugin {
                 server::spawn_requested_fragment_pools,
                 server::simulate_server_fragments,
             )
-                .chain(),
+                .chain()
+                .run_if(in_state(AppState::Hosting)),
         );
     }
 }
@@ -67,11 +72,20 @@ pub struct FragmentRenderPlugin;
 #[cfg(feature = "gui")]
 impl Plugin for FragmentRenderPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, render::setup_fragment_balance);
+        app.add_systems(OnEnter(AppState::Playing), render::setup_fragment_balance);
+        app.add_systems(
+            OnExit(AppState::Playing),
+            |mut commands: Commands, texts: Query<Entity, With<render::FragmentBalanceText>>| {
+                for entity in &texts {
+                    commands.entity(entity).despawn();
+                }
+            },
+        );
 
+        app.add_systems(Update, render::draw_fragments.run_if(game_is_active));
         app.add_systems(
             Update,
-            (render::draw_fragments, render::update_fragment_balance),
+            render::update_fragment_balance.run_if(in_state(AppState::Playing)),
         );
     }
 }

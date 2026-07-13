@@ -1,3 +1,4 @@
+pub mod app;
 pub mod protocol;
 
 #[cfg(feature = "client")]
@@ -13,6 +14,8 @@ pub mod weapon;
 
 #[cfg(feature = "gui")]
 pub mod renderer;
+#[cfg(feature = "gui")]
+pub mod ui;
 
 pub mod shared;
 

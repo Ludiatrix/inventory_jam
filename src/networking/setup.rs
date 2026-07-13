@@ -10,7 +10,6 @@ use lightyear::prelude::client::*;
 #[cfg(feature = "server")]
 use lightyear::prelude::server::*;
 
-use super::RunMode;
 #[cfg(feature = "client")]
 use super::client::{ClientTransports, NetworkClient};
 #[cfg(feature = "server")]
@@ -28,6 +27,9 @@ use super::shared::SERVER_ADDR;
 #[cfg(feature = "server")]
 use super::shared::SERVER_PORT;
 use super::shared::SHARED_SETTINGS;
+use crate::app::{AppState, LaunchMode, StartGame};
+#[cfg(feature = "client")]
+use crate::app::{LocalUsername, client_id_from_username};
 
 #[cfg(feature = "client")]
 const CERT_DIGEST: &str = "18b16f92178824528aabb1c4274a0f247d0dec2c6f755e152739ff2fe343ec7c";
@@ -51,17 +53,6 @@ pub struct NetworkingConfig {
 }
 
 impl NetworkingConfig {
-    pub fn for_mode(mode: RunMode) -> Self {
-        match mode {
-            #[cfg(feature = "client")]
-            RunMode::Client {
-                use_local_server, ..
-            } => Self::for_client(use_local_server),
-            #[cfg(feature = "server")]
-            RunMode::Server => Self::for_server(),
-        }
-    }
-
     #[cfg(feature = "client")]
     fn for_client(use_local_server: bool) -> Self {
         if use_local_server {
@@ -106,9 +97,9 @@ impl NetworkingConfig {
 }
 
 #[cfg(feature = "client")]
-#[derive(Resource, Clone)]
-pub struct NetworkingRuntime {
-    pub certificate_digest: String,
+#[derive(Resource)]
+struct NetworkingRuntime {
+    certificate_digest: String,
 }
 
 #[cfg(feature = "client")]
@@ -118,76 +109,43 @@ struct ClientConnection {
     config: NetworkingConfig,
 }
 
-pub fn spawn_connections(app: &mut App, mode: RunMode) {
-    let config = NetworkingConfig::for_mode(mode);
+#[cfg(feature = "client")]
+#[derive(Resource)]
+struct KickoffDiscovery;
+
+#[cfg(feature = "server")]
+#[derive(Component)]
+struct ServerStarted;
+
+#[derive(Resource, Default)]
+pub struct ConnectionStatus {
+    pub message: String,
+}
+
+pub fn configure_networking(app: &mut App) {
+    app.init_resource::<ConnectionStatus>();
+    app.add_systems(Update, handle_start_game);
+
     #[cfg(feature = "client")]
-    app.insert_resource(NetworkingRuntime {
-        certificate_digest: config.certificate_digest.clone(),
-    });
-
-    let conditioner = link_conditioner();
-
-    match mode {
-        #[cfg(feature = "client")]
-        RunMode::Client {
-            client_id,
-            use_local_server,
-        } => {
-            if use_local_server {
-                info!("connecting client to {}", config.server_addr);
-                spawn_client(
-                    &mut app.world_mut().commands(),
-                    client_id,
-                    config.server_addr,
-                    &config,
-                    conditioner,
-                );
-                app.add_systems(Update, (connect_client_once, patch_webtransport_digest));
-            } else {
-                app.add_plugins(ReqwestPlugin::default());
-                app.insert_resource(ServerDiscovery::new());
-                app.insert_resource(ClientConnection { client_id, config });
-                app.add_systems(Startup, start_server_discovery);
-                app.add_systems(
-                    Update,
-                    (
-                        send_due_status_requests,
-                        spawn_discovered_client,
-                        connect_client_once,
-                        patch_webtransport_digest,
-                    ),
-                );
-            }
-        }
-        #[cfg(feature = "server")]
-        RunMode::Server => {
-            info!(
-                "server networking config transport {:?} bind port {} public addr {} edgegap {}",
-                config.transport,
-                config.server_port,
-                config.server_addr,
-                edgegap::is_edgegap_server()
-            );
-            if let Some(deployment) = edgegap::deployment_info() {
-                info!(
-                    "edgegap deployment {} public {}:{} internal {}",
-                    deployment.request_id,
-                    deployment.public_ip,
-                    deployment.public_port,
-                    deployment.internal_port
-                );
-            }
-            app.world_mut().spawn((
-                Name::new("Network Server"),
-                NetworkServer {
-                    conditioner,
-                    transport: server_transport(&config),
-                    shared: SHARED_SETTINGS,
-                },
-            ));
-            app.add_systems(Startup, start_server);
-        }
+    {
+        app.add_plugins(ReqwestPlugin::default());
+        app.add_systems(
+            Update,
+            (
+                kickoff_discovery,
+                send_due_status_requests,
+                spawn_discovered_client,
+                connect_client_once,
+                patch_webtransport_digest,
+                watch_client_connection_state,
+                #[cfg(feature = "gui")]
+                watch_discovery_failures,
+            ),
+        );
     }
+
+    #[cfg(feature = "server")]
+    app.add_systems(Update, start_pending_servers);
 }
 
 fn link_conditioner() -> Option<RecvLinkConditioner> {
@@ -203,13 +161,121 @@ fn link_conditioner() -> Option<RecvLinkConditioner> {
     }
 }
 
+fn handle_start_game(
+    mut commands: Commands,
+    mut starts: MessageReader<StartGame>,
+    mut status: ResMut<ConnectionStatus>,
+    mut next_state: ResMut<NextState<AppState>>,
+    #[cfg(feature = "client")] clients: Query<Entity, With<Client>>,
+    #[cfg(feature = "client")] mut username: ResMut<LocalUsername>,
+    #[cfg(feature = "server")] servers: Query<Entity, With<Server>>,
+) {
+    for start in starts.read() {
+        match start.mode {
+            #[cfg(feature = "client")]
+            LaunchMode::JoinEdgegap => {
+                if !clients.is_empty() {
+                    status.message = "already connected".into();
+                    continue;
+                }
+                username.0.clone_from(&start.username);
+                let config = NetworkingConfig::for_client(false);
+                commands.insert_resource(NetworkingRuntime {
+                    certificate_digest: config.certificate_digest.clone(),
+                });
+                commands.insert_resource(ServerDiscovery::new());
+                commands.insert_resource(ClientConnection {
+                    client_id: client_id_from_username(&start.username),
+                    config,
+                });
+                commands.insert_resource(KickoffDiscovery);
+                status.message = "searching for Edgegap server...".into();
+                next_state.set(AppState::Connecting);
+            }
+            #[cfg(feature = "client")]
+            LaunchMode::JoinLocal => {
+                if !clients.is_empty() {
+                    status.message = "already connected".into();
+                    continue;
+                }
+                username.0.clone_from(&start.username);
+                let config = NetworkingConfig::for_client(true);
+                commands.insert_resource(NetworkingRuntime {
+                    certificate_digest: config.certificate_digest.clone(),
+                });
+                info!("connecting client to {}", config.server_addr);
+                status.message = format!("connecting to {}...", config.server_addr);
+                next_state.set(AppState::Connecting);
+                spawn_client(
+                    &mut commands,
+                    client_id_from_username(&start.username),
+                    config.server_addr,
+                    &config,
+                    link_conditioner(),
+                );
+            }
+            #[cfg(feature = "server")]
+            LaunchMode::HostLocal | LaunchMode::DedicatedServer => {
+                if !servers.is_empty() {
+                    status.message = "server already running".into();
+                    continue;
+                }
+                let config = NetworkingConfig::for_server();
+                info!(
+                    "starting server transport {:?} bind port {} public addr {} edgegap {}",
+                    config.transport,
+                    config.server_port,
+                    config.server_addr,
+                    edgegap::is_edgegap_server()
+                );
+                if let Some(deployment) = edgegap::deployment_info() {
+                    info!(
+                        "edgegap deployment {} public {}:{} internal {}",
+                        deployment.request_id,
+                        deployment.public_ip,
+                        deployment.public_port,
+                        deployment.internal_port
+                    );
+                }
+                status.message = format!("server running on port {}", config.server_port);
+                next_state.set(AppState::Hosting);
+                commands.spawn((
+                    Name::new("Network Server"),
+                    NetworkServer {
+                        conditioner: link_conditioner(),
+                        transport: server_transport(&config),
+                        shared: SHARED_SETTINGS,
+                    },
+                ));
+            }
+            LaunchMode::Menu => {}
+            #[allow(unreachable_patterns)]
+            _ => {}
+        }
+    }
+}
+
+#[cfg(feature = "client")]
+fn kickoff_discovery(
+    mut commands: Commands,
+    kickoff: Option<Res<KickoffDiscovery>>,
+    discovery: Option<ResMut<ServerDiscovery>>,
+    client: bevy_mod_reqwest::BevyReqwest,
+) {
+    if kickoff.is_none() {
+        return;
+    }
+    commands.remove_resource::<KickoffDiscovery>();
+    start_server_discovery(discovery, client);
+}
+
 #[cfg(feature = "client")]
 fn spawn_discovered_client(
     mut commands: Commands,
     discovery: Option<Res<ServerDiscovery>>,
     connection: Option<Res<ClientConnection>>,
     clients: Query<Entity, With<Client>>,
-    mut logged_failure: Local<bool>,
+    mut status: ResMut<ConnectionStatus>,
 ) {
     if !clients.is_empty() {
         return;
@@ -221,6 +287,7 @@ fn spawn_discovered_client(
         ServerDiscoveryState::Discovering => {}
         ServerDiscoveryState::Ready(server_addr) => {
             info!("connecting client to {server_addr}");
+            status.message = format!("connecting to {server_addr}...");
             spawn_client(
                 &mut commands,
                 connection.client_id,
@@ -232,10 +299,7 @@ fn spawn_discovered_client(
             commands.remove_resource::<ServerDiscovery>();
         }
         ServerDiscoveryState::Failed(error) => {
-            if !*logged_failure {
-                error!("server discovery failed: {error}");
-                *logged_failure = true;
-            }
+            status.message = format!("server discovery failed: {error}");
         }
     }
 }
@@ -291,46 +355,90 @@ fn server_transport(config: &NetworkingConfig) -> ServerTransports {
 }
 
 #[cfg(feature = "server")]
-fn start_server(mut commands: Commands, server: Single<Entity, With<Server>>) {
-    commands.trigger(Start {
-        entity: server.into_inner(),
-    });
+fn start_pending_servers(
+    mut commands: Commands,
+    servers: Query<Entity, (With<Server>, Without<ServerStarted>)>,
+) {
+    for entity in &servers {
+        commands.trigger(Start { entity });
+        commands.entity(entity).insert(ServerStarted);
+    }
 }
 
 #[cfg(feature = "client")]
 fn connect_client_once(
     mut commands: Commands,
-    client: Query<Entity, With<Client>>,
-    mut connected: Local<bool>,
+    client: Query<Entity, (With<Client>, Without<Connected>)>,
+    mut connecting: Local<Option<Entity>>,
 ) {
-    if *connected || client.is_empty() {
-        return;
-    }
     let Some(entity) = client.iter().next() else {
         return;
     };
+    if *connecting == Some(entity) {
+        return;
+    }
     commands.trigger(Connect { entity });
-    *connected = true;
+    *connecting = Some(entity);
 }
 
 #[cfg(feature = "client")]
 fn patch_webtransport_digest(
-    config: Res<NetworkingRuntime>,
+    config: Option<Res<NetworkingRuntime>>,
     mut clients: Query<&mut WebTransportClientIo, With<Client>>,
-    mut done: Local<bool>,
 ) {
-    if *done || config.certificate_digest.is_empty() {
-        *done = true;
+    let Some(config) = config else {
         return;
-    }
-    if clients.is_empty() {
+    };
+    if config.certificate_digest.is_empty() || clients.is_empty() {
         return;
     }
     #[cfg(not(target_family = "wasm"))]
     {
         for mut io in &mut clients {
-            io.certificate_digest.clone_from(&config.certificate_digest);
+            if io.certificate_digest != config.certificate_digest {
+                io.certificate_digest.clone_from(&config.certificate_digest);
+            }
         }
     }
-    *done = true;
+    #[cfg(target_family = "wasm")]
+    {
+        let _ = &mut clients;
+    }
+}
+
+#[cfg(feature = "client")]
+fn watch_client_connection_state(
+    connected: Query<(), (With<Client>, With<Connected>)>,
+    mut status: ResMut<ConnectionStatus>,
+    mut next_state: ResMut<NextState<AppState>>,
+    current: Res<State<AppState>>,
+    mut was_connected: Local<bool>,
+) {
+    let is_connected = !connected.is_empty();
+    if is_connected && !*was_connected {
+        status.message = "connected".into();
+        next_state.set(AppState::Playing);
+    }
+    if !is_connected && *was_connected && *current.get() == AppState::Playing {
+        status.message = "disconnected".into();
+        next_state.set(AppState::MainMenu);
+    }
+    *was_connected = is_connected;
+}
+
+#[cfg(all(feature = "client", feature = "gui"))]
+fn watch_discovery_failures(
+    discovery: Option<Res<ServerDiscovery>>,
+    mut next_state: ResMut<NextState<AppState>>,
+    current: Res<State<AppState>>,
+) {
+    if *current.get() != AppState::Connecting {
+        return;
+    }
+    let Some(discovery) = discovery else {
+        return;
+    };
+    if matches!(discovery.state, ServerDiscoveryState::Failed(_)) {
+        next_state.set(AppState::MainMenu);
+    }
 }

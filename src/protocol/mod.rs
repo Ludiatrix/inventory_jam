@@ -6,10 +6,10 @@ pub mod rooms;
 
 use bevy::prelude::*;
 
-pub use channels::ServerEventsChannel;
+pub use channels::{ClientEventsChannel, ServerEventsChannel};
 pub use inputs::PlayerAction;
-pub use messages::DebugServerMessage;
-pub use player::{PlayerAimDirection, PlayerColor, PlayerId, PlayerPosition};
+pub use messages::{DebugServerMessage, SetUsername};
+pub use player::{PlayerAimDirection, PlayerColor, PlayerId, PlayerPosition, PlayerUsername};
 
 pub use crate::projectile::protocol::{PlayerProjectile, ProjectileImpact};
 pub use crate::projectile::shared::{ProjectileLifetime, ProjectilePosition};

@@ -1,9 +1,15 @@
-use crate::protocol::rooms::{GameRoom, GameRooms};
+use crate::protocol::rooms::GameRoom;
+#[cfg(feature = "server")]
+use crate::protocol::rooms::GameRooms;
 use bevy::math::Curve;
 use bevy::prelude::*;
 use lightyear::prelude::*;
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "server")]
+use crate::app::temporary_username;
+
+#[cfg(feature = "server")]
 #[derive(Bundle)]
 pub(crate) struct PlayerBundle {
     id: PlayerId,
@@ -11,8 +17,10 @@ pub(crate) struct PlayerBundle {
     color: PlayerColor,
     aim_direction: PlayerAimDirection,
     game_room: GameRoom,
+    username: PlayerUsername,
 }
 
+#[cfg(feature = "server")]
 impl PlayerBundle {
     pub(crate) fn new(id: PeerId, position: Vec2) -> Self {
         let h = (((id.to_bits().wrapping_mul(30)) % 360) as f32) / 360.0;
@@ -26,6 +34,7 @@ impl PlayerBundle {
             game_room: GameRoom {
                 room: GameRooms::Arena,
             },
+            username: PlayerUsername(temporary_username(id.to_bits())),
         }
     }
 }
@@ -57,6 +66,9 @@ impl Default for PlayerAimDirection {
 #[derive(Component, Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct PlayerColor(pub(crate) Color);
 
+#[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq, Deref)]
+pub struct PlayerUsername(pub String);
+
 pub fn register(app: &mut App) {
     app.component::<PlayerId>().replicate();
 
@@ -70,4 +82,6 @@ pub fn register(app: &mut App) {
     app.component::<PlayerColor>().replicate();
 
     app.component::<GameRoom>().replicate();
+
+    app.component::<PlayerUsername>().replicate();
 }

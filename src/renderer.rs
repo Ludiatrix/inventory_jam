@@ -1,23 +1,35 @@
+use crate::app::{AppState, game_is_active};
 use crate::enemy::render::draw_enemy_boxes;
 use crate::protocol::*;
 use crate::shared::{ARENA_WORLD_BOUNDS, SHOP_WORLD_BOUNDS};
 use bevy::prelude::*;
+use bevy::sprite::Anchor;
 
 const GRID_SPACING: f32 = 100.0;
+const USERNAME_LABEL_OFFSET: Vec3 = Vec3::new(0.0, 40.0, 10.0);
 
 #[derive(Clone)]
 pub struct ExampleRendererPlugin;
 
 impl Plugin for ExampleRendererPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, (init, setup_instructions));
+        app.add_systems(Startup, init);
+        app.add_systems(OnEnter(AppState::Playing), setup_instructions);
+        app.add_systems(OnExit(AppState::Playing), cleanup_instructions);
 
         app.add_systems(
             Update,
-            (draw_test_worlds, draw_player_boxes, draw_enemy_boxes),
+            (
+                draw_test_worlds,
+                draw_player_boxes,
+                draw_enemy_boxes,
+                sync_username_labels,
+            )
+                .run_if(game_is_active),
         );
     }
 }
+
 fn init(mut commands: Commands) {
     commands.spawn(Camera2d);
 }
@@ -86,8 +98,17 @@ fn draw_test_world(gizmos: &mut Gizmos, bounds: Rect) {
     );
 }
 
+#[derive(Component)]
+struct InstructionsText;
+
+#[derive(Component)]
+struct UsernameLabel {
+    player: Entity,
+}
+
 fn setup_instructions(mut commands: Commands) {
     commands.spawn((
+        InstructionsText,
         Name::new("Input Control Instructions"),
         Text::new(
             "Move with WASD\nAim with Mouse\nHold Left Click to Fire\nN spawns an enemy (host/server debug)\nShift uses Skill",
@@ -99,4 +120,47 @@ fn setup_instructions(mut commands: Commands) {
             ..default()
         },
     ));
+}
+
+fn cleanup_instructions(mut commands: Commands, texts: Query<Entity, With<InstructionsText>>) {
+    for entity in &texts {
+        commands.entity(entity).despawn();
+    }
+}
+
+fn sync_username_labels(
+    mut commands: Commands,
+    players: Query<(Entity, &PlayerPosition, &PlayerUsername)>,
+    mut labels: Query<(Entity, &UsernameLabel, &mut Transform, &mut Text2d)>,
+) {
+    for (player, position, username) in &players {
+        if let Some((_, _, mut transform, mut text)) = labels
+            .iter_mut()
+            .find(|(_, label, _, _)| label.player == player)
+        {
+            transform.translation = position.0.extend(0.0) + USERNAME_LABEL_OFFSET;
+            if text.0 != username.0 {
+                text.0.clone_from(&username.0);
+            }
+            continue;
+        }
+
+        commands.spawn((
+            UsernameLabel { player },
+            Text2d::new(username.0.clone()),
+            TextFont {
+                font_size: FontSize::Px(18.0),
+                ..default()
+            },
+            TextColor(Color::WHITE),
+            Anchor::BOTTOM_CENTER,
+            Transform::from_translation(position.0.extend(0.0) + USERNAME_LABEL_OFFSET),
+        ));
+    }
+
+    for (label_entity, label, _, _) in &labels {
+        if players.get(label.player).is_err() {
+            commands.entity(label_entity).despawn();
+        }
+    }
 }

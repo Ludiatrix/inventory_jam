@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 
 #[cfg(feature = "server")]
+use crate::app::AppState;
+#[cfg(feature = "server")]
 use crate::shared::FixedGameplaySet;
 
 #[cfg(feature = "client")]
@@ -42,7 +44,8 @@ impl Plugin for WeaponServerPlugin {
                 server::fire_equipped_weapons,
             )
                 .chain()
-                .in_set(FixedGameplaySet::WeaponSimulation),
+                .in_set(FixedGameplaySet::WeaponSimulation)
+                .run_if(in_state(AppState::Hosting)),
         );
     }
 }
