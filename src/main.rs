@@ -8,8 +8,7 @@ use inventory_jam::app::*;
 #[cfg(feature = "client")]
 use inventory_jam::client::ExampleClientPlugin;
 use inventory_jam::enemy::{EnemyProtocolPlugin, EnemyRenderPlugin, EnemyServerPlugin};
-#[cfg(feature = "gui")]
-use inventory_jam::projectile;
+use inventory_jam::projectile::{ProjectileClientPlugin, ProjectileProtocolPlugin, ProjectileRenderPlugin, ProjectileServerPlugin};
 #[cfg(feature = "gui")]
 use inventory_jam::renderer;
 #[cfg(feature = "server")]
@@ -46,6 +45,7 @@ fn main() {
         LaunchPlugin,
         SharedPlugin,
         EnemyProtocolPlugin,
+        ProjectileProtocolPlugin,
         fragment::FragmentProtocolPlugin,
         weapon::WeaponProtocolPlugin,
     ));
@@ -56,19 +56,24 @@ fn main() {
         .add_plugins((
             ExampleServerPlugin,
             EnemyServerPlugin,
+            ProjectileServerPlugin,
             fragment::FragmentServerPlugin,
             weapon::WeaponServerPlugin,
         ));
 
     #[cfg(feature = "client")]
-    app.add_plugins((ExampleClientPlugin, fragment::FragmentClientPlugin));
+    app.add_plugins((
+        ExampleClientPlugin,
+        ProjectileClientPlugin,
+        fragment::FragmentClientPlugin,
+    ));
 
     app.insert_state(AppState::MainMenu);
 
     #[cfg(feature = "gui")]
     app.add_plugins((
         renderer::ExampleRendererPlugin,
-        projectile::ProjectileRenderPlugin,
+        ProjectileRenderPlugin,
         EnemyRenderPlugin,
         fragment::FragmentRenderPlugin,
         weapon::WeaponRenderPlugin,
