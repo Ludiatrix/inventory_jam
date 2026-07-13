@@ -1,16 +1,18 @@
-use crate::app::AppState;
+use crate::app::{AppState, game_is_active};
 use crate::player::protocol::{
     CachedCursorAim, PlayerAimDirection, PlayerPosition, SmoothedAimDirection,
 };
+use crate::player::{PlayerColor, PlayerUsername};
 use crate::protocol::inputs::PlayerAction;
 use bevy::app::{App, Plugin, Update};
 use bevy::camera::{Camera, Camera2d};
 use bevy::color::Color;
-use bevy::math::{Isometry2d, StableInterpolate, Vec2};
+use bevy::math::{Isometry2d, StableInterpolate, Vec2, Vec3};
 use bevy::prelude::{
-    Gizmos, GlobalTransform, IntoScheduleConfigs, Query, Res, Single, Time, Transform, Window,
-    With, in_state,
+    Commands, Component, Entity, FontSize, Gizmos, GlobalTransform, IntoScheduleConfigs, Query,
+    Res, Single, Text2d, TextColor, TextFont, Time, Transform, Window, With, default, in_state,
 };
+use bevy::sprite::Anchor;
 use bevy::window::PrimaryWindow;
 use leafwing_input_manager::input_map::InputMap;
 use lightyear::prediction::Predicted;
@@ -18,11 +20,14 @@ use lightyear::prelude::Controlled;
 
 /// How quickly should the camera snap to the desired location
 const CAMERA_DECAY_RATE: f32 = 2.;
+const USERNAME_LABEL_OFFSET: Vec3 = Vec3::new(0.0, 40.0, 10.0);
 
 pub struct PlayerRenderPlugin;
 
 impl Plugin for PlayerRenderPlugin {
     fn build(&self, app: &mut App) {
+        app.add_systems(Update, draw_player_boxes.run_if(game_is_active));
+        app.add_systems(Update, (sync_username_labels).run_if(game_is_active));
         app.add_systems(
             Update,
             draw_local_aimstick.run_if(in_state(AppState::Playing)),
@@ -39,6 +44,61 @@ impl Plugin for PlayerRenderPlugin {
                 .chain()
                 .run_if(in_state(AppState::Playing)),
         );
+    }
+}
+
+#[derive(Component)]
+struct UsernameLabel {
+    player: Entity,
+}
+
+pub(crate) fn draw_player_boxes(
+    mut gizmos: Gizmos,
+    players: Query<(&PlayerPosition, &PlayerColor)>,
+) {
+    for (position, color) in &players {
+        gizmos.rect_2d(
+            Isometry2d::from_translation(position.0),
+            Vec2::ONE * 50.0,
+            color.0,
+        );
+    }
+}
+
+fn sync_username_labels(
+    mut commands: Commands,
+    players: Query<(Entity, &PlayerPosition, &PlayerUsername)>,
+    mut labels: Query<(Entity, &UsernameLabel, &mut Transform, &mut Text2d)>,
+) {
+    for (player, position, username) in &players {
+        if let Some((_, _, mut transform, mut text)) = labels
+            .iter_mut()
+            .find(|(_, label, _, _)| label.player == player)
+        {
+            transform.translation = position.0.extend(0.0) + USERNAME_LABEL_OFFSET;
+            if text.0 != username.0 {
+                text.0.clone_from(&username.0);
+            }
+            continue;
+        }
+
+        commands.spawn((
+            UsernameLabel { player },
+            Text2d::new(username.0.clone()),
+            TextFont {
+                font_size: FontSize::Px(18.0),
+                ..default()
+            },
+            TextColor(Color::WHITE),
+            Anchor::BOTTOM_CENTER,
+            Transform::from_translation(position.0.extend(0.0) + USERNAME_LABEL_OFFSET),
+        ));
+    }
+
+    for (label_entity, label, _, _) in &labels {
+        if players.get(label.player).is_err() {
+            commands.entity(label_entity).despawn();
+        }
     }
 }
 

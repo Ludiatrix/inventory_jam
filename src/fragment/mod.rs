@@ -1,3 +1,4 @@
+#[cfg(feature = "server")]
 mod api;
 #[cfg(feature = "client")]
 mod client;

@@ -6,17 +6,16 @@ use bevy::window::PresentMode;
 use bevy::winit::WinitSettings;
 use inventory_jam::app::*;
 use inventory_jam::enemy::EnemyPlugin;
+use inventory_jam::fragment::FragmentPlugin;
+use inventory_jam::networking;
 use inventory_jam::player::PlayerPlugin;
 use inventory_jam::projectile::ProjectilePlugin;
-#[cfg(feature = "gui")]
-use inventory_jam::renderer;
 #[cfg(feature = "server")]
 use inventory_jam::server::ExampleServerPlugin;
 use inventory_jam::shared::SharedPlugin;
-#[cfg(feature = "gui")]
-use inventory_jam::ui::MenuPlugin;
+use inventory_jam::ui::UiPlugin;
 use inventory_jam::weapon::WeaponPlugin;
-use inventory_jam::{fragment, networking};
+use inventory_jam::world::WorldPlugin;
 use std::time::Duration;
 
 const TICK_DURATION: Duration =
@@ -41,25 +40,24 @@ fn main() {
         tick_duration: TICK_DURATION,
     });
 
+    app.insert_state(AppState::MainMenu);
+
     app.add_plugins((
+        WorldPlugin,
+        UiPlugin,
         LaunchPlugin,
         SharedPlugin,
         PlayerPlugin,
         EnemyPlugin,
         ProjectilePlugin,
         WeaponPlugin,
-        fragment::FragmentPlugin,
+        FragmentPlugin,
     ));
     networking::configure_networking(&mut app);
 
     #[cfg(feature = "server")]
     app.add_observer(networking::apply_server_link_conditioner)
         .add_plugins(ExampleServerPlugin);
-
-    app.insert_state(AppState::MainMenu);
-
-    #[cfg(feature = "gui")]
-    app.add_plugins((renderer::ExampleRendererPlugin, MenuPlugin));
 
     app.run();
 }
