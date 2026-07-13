@@ -1,9 +1,11 @@
 use crate::app::{AppState, LocalUsername};
-use crate::player::protocol::{CachedCursorAim, SmoothedAimDirection};
+use crate::player::protocol::{
+    CachedCursorAim, PlayerAimDirection, PlayerColor, PlayerId, PlayerPosition,
+    SmoothedAimDirection,
+};
 use crate::protocol::channels::ClientEventsChannel;
 use crate::protocol::inputs::PlayerAction;
 use crate::protocol::messages::{DebugServerMessage, SetUsername};
-use crate::protocol::player::{PlayerAimDirection, PlayerColor, PlayerId, PlayerPosition};
 use crate::protocol::rooms::GameRoom;
 use crate::shared;
 use bevy::app::{App, FixedPreUpdate, FixedUpdate, Plugin, Update};

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use lightyear::prelude::{Interpolated, Predicted, Replicate};
 
-use crate::protocol::player::{PlayerAimDirection, PlayerPosition};
+use crate::player::{PlayerAimDirection, PlayerPosition};
 use crate::{
     app::game_is_active,
     weapon::protocol::{EquippedWeapon, WeaponKind},

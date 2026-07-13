@@ -4,8 +4,8 @@ use crate::fragment::{
     protocol::{CarriedFragments, Fragment},
     shared::{self as fragment_shared, FragmentLifetime, FragmentPosition, ServerFragment},
 };
+use crate::player::{PlayerId, PlayerPosition};
 use crate::protocol::inputs::PlayerAction;
-use crate::protocol::player::{PlayerId, PlayerPosition};
 use crate::protocol::rooms::GameRoom;
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;

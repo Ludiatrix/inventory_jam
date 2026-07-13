@@ -1,7 +1,7 @@
 use crate::app::{AppState, validate_username};
+use crate::player::protocol::{PlayerAimDirection, PlayerBundle, PlayerPosition, PlayerUsername};
 use crate::protocol::inputs::PlayerAction;
 use crate::protocol::messages::SetUsername;
-use crate::protocol::player::{PlayerAimDirection, PlayerBundle, PlayerPosition, PlayerUsername};
 use crate::protocol::rooms::{GameRoom, GameRooms};
 use crate::shared;
 use crate::shared::FixedGameplaySet;

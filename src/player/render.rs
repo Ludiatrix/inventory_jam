@@ -1,7 +1,8 @@
 use crate::app::AppState;
-use crate::player::protocol::{CachedCursorAim, SmoothedAimDirection};
+use crate::player::protocol::{
+    CachedCursorAim, PlayerAimDirection, PlayerPosition, SmoothedAimDirection,
+};
 use crate::protocol::inputs::PlayerAction;
-use crate::protocol::player::{PlayerAimDirection, PlayerPosition};
 use bevy::app::{App, Plugin, Update};
 use bevy::camera::{Camera, Camera2d};
 use bevy::color::Color;

@@ -20,7 +20,7 @@ use crate::fragment::{
     protocol::Fragment,
     shared::{self as fragment_shared, ClientFragment, FragmentPosition, ServerFragment},
 };
-use crate::protocol::player::{PlayerId, PlayerPosition};
+use crate::player::{PlayerId, PlayerPosition};
 
 /// Creates client-only presentation state when a replicated fragment arrives.
 pub(crate) fn initialize_fragment(

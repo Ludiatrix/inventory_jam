@@ -1,7 +1,6 @@
 pub mod channels;
 pub mod inputs;
 pub mod messages;
-pub mod player;
 pub mod rooms;
 
 use bevy::prelude::*;
@@ -14,6 +13,5 @@ impl Plugin for ProtocolPlugin {
         channels::register(app);
         messages::register(app);
         inputs::register(app);
-        player::register(app);
     }
 }

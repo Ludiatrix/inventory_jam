@@ -2,9 +2,9 @@ use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 use lightyear::prelude::*;
 
+use crate::player::{PlayerAimDirection, PlayerId, PlayerPosition};
 use crate::projectile::PlayerProjectile;
 use crate::protocol::inputs::PlayerAction;
-use crate::protocol::player::{PlayerAimDirection, PlayerId, PlayerPosition};
 use crate::protocol::rooms::GameRoom;
 use crate::{
     projectile::shared::{

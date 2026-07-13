@@ -1,5 +1,5 @@
 use crate::app::{AppState, game_is_active};
-use crate::protocol::player::{PlayerColor, PlayerPosition, PlayerUsername};
+use crate::player::{PlayerColor, PlayerPosition, PlayerUsername};
 use crate::shared::{ARENA_WORLD_BOUNDS, SHOP_WORLD_BOUNDS};
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
