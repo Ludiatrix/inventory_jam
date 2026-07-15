@@ -4,7 +4,9 @@ mod help_text;
 mod menu;
 
 use bevy::app::{App, Plugin};
+#[cfg(feature = "gui")]
 use help_text::HelpTextPlugin;
+#[cfg(feature = "gui")]
 use menu::MenuPlugin;
 
 pub struct UiPlugin;

@@ -1,22 +1,37 @@
+mod app;
+mod enemy;
+mod fragment;
+mod networking;
+mod persistence;
+mod player;
+mod projectile;
+mod protocol;
+#[cfg(feature = "server")]
+mod server;
+mod shared;
+mod ui;
+mod weapon;
+mod world;
+
+use app::*;
 use bevy::log::{Level, LogPlugin};
 use bevy::prelude::*;
 #[cfg(feature = "gui")]
 use bevy::window::PresentMode;
 #[cfg(feature = "gui")]
 use bevy::winit::WinitSettings;
-use inventory_jam::app::*;
-use inventory_jam::enemy::EnemyPlugin;
-use inventory_jam::fragment::FragmentPlugin;
-use inventory_jam::networking;
-use inventory_jam::player::PlayerPlugin;
-use inventory_jam::projectile::ProjectilePlugin;
+use enemy::EnemyPlugin;
+use fragment::FragmentPlugin;
+use persistence::PersistencePlugin;
+use player::PlayerPlugin;
+use projectile::ProjectilePlugin;
 #[cfg(feature = "server")]
-use inventory_jam::server::ExampleServerPlugin;
-use inventory_jam::shared::SharedPlugin;
-use inventory_jam::ui::UiPlugin;
-use inventory_jam::weapon::WeaponPlugin;
-use inventory_jam::world::WorldPlugin;
+use server::ExampleServerPlugin;
+use shared::SharedPlugin;
 use std::time::Duration;
+use ui::UiPlugin;
+use weapon::WeaponPlugin;
+use world::WorldPlugin;
 
 const TICK_DURATION: Duration =
     Duration::from_nanos((1_000_000_000.0 / networking::FIXED_TIMESTEP_HZ) as u64);
@@ -52,6 +67,7 @@ fn main() {
         ProjectilePlugin,
         WeaponPlugin,
         FragmentPlugin,
+        PersistencePlugin,
     ));
     networking::configure_networking(&mut app);
 

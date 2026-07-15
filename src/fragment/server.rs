@@ -1,12 +1,14 @@
 use crate::app::AppState;
 use crate::fragment::api::SpawnFragmentPool;
 use crate::fragment::{
-    protocol::{CarriedFragments, Fragment},
+    protocol::Fragment,
     shared::{self as fragment_shared, FragmentLifetime, FragmentPosition, ServerFragment},
 };
-use crate::player::{PlayerId, PlayerPosition};
+use crate::persistence::{PersistenceReady, Transaction};
+use crate::player::{PlayerId, PlayerPosition, PlayerUsername};
 use crate::protocol::inputs::PlayerAction;
 use crate::protocol::rooms::GameRoom;
+use crate::shared::FixedGameplaySet;
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 use lightyear::prelude::*;
@@ -30,32 +32,14 @@ impl Plugin for FragmentServerPlugin {
         app.add_systems(
             FixedUpdate,
             (
-                ensure_player_fragment_wallets,
                 request_debug_fragment_pool,
                 spawn_requested_fragment_pools,
                 simulate_server_fragments,
             )
                 .chain()
+                .before(FixedGameplaySet::Persistence)
                 .run_if(in_state(AppState::Hosting)),
         );
-    }
-}
-
-/// Ensures every authoritative player has fragment currency state owned by this
-/// feature. Predicted host-client copies are deliberately ignored.
-pub(crate) fn ensure_player_fragment_wallets(
-    mut commands: Commands,
-    players: Query<(Entity, Has<Predicted>), (With<PlayerId>, Without<CarriedFragments>)>,
-    host_server: Query<(), With<lightyear::connection::host::HostServer>>,
-) {
-    let is_host_server = !host_server.is_empty();
-
-    for (entity, predicted) in &players {
-        if is_host_server && predicted {
-            continue;
-        }
-
-        commands.entity(entity).insert(CarriedFragments::default());
     }
 }
 
@@ -154,7 +138,8 @@ pub(crate) fn simulate_server_fragments(
         With<ServerFragment>,
     >,
     players: Query<(Entity, &PlayerId, &PlayerPosition, Has<Predicted>)>,
-    mut wallets: Query<&mut CarriedFragments>,
+    ready_players: Query<&PlayerUsername, With<PersistenceReady>>,
+    mut transactions: MessageWriter<Transaction>,
     host_server: Query<(), With<lightyear::connection::host::HostServer>>,
 ) {
     let is_host_server = !host_server.is_empty();
@@ -175,17 +160,12 @@ pub(crate) fn simulate_server_fragments(
         if let Some((player_entity, collector)) =
             nearest_player_in_collection_range(position.0, &players, is_host_server)
         {
-            match wallets.get_mut(player_entity) {
-                Ok(mut carried_fragments) => {
-                    carried_fragments.0 = carried_fragments.0.saturating_add(1);
-                }
-                Err(_) => {
-                    // This keeps collection correct even if a player was spawned
-                    // immediately before this system ran.
-                    commands.entity(player_entity).insert(CarriedFragments(1));
-                }
-            }
+            let Ok(username) = ready_players.get(player_entity) else {
+                // Player is not persistence-ready yet; leave the fragment available.
+                continue;
+            };
 
+            transactions.write(Transaction::add_fragments(username.0.clone(), 1));
             fragment.collector = Some(collector);
 
             info!(

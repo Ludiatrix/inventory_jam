@@ -1,7 +1,6 @@
-use crate::app::{AppState, validate_username};
-use crate::player::protocol::{PlayerAimDirection, PlayerBundle, PlayerPosition, PlayerUsername};
+use crate::app::AppState;
+use crate::player::protocol::{PlayerAimDirection, PlayerBundle, PlayerPosition};
 use crate::protocol::inputs::PlayerAction;
-use crate::protocol::messages::SetUsername;
 use crate::protocol::rooms::{GameRoom, GameRooms};
 use crate::shared;
 use crate::shared::FixedGameplaySet;
@@ -22,18 +21,13 @@ impl Plugin for PlayerServerPlugin {
             FixedUpdate,
             (authoritative_player_movement, update_player_aim_direction)
                 .chain()
-                .in_set(FixedGameplaySet::PlayerSimulation)
+                .in_set(FixedGameplaySet::Player)
                 .run_if(in_state(AppState::Hosting)),
         );
 
         app.add_systems(
             FixedUpdate,
             debug_switch_rooms.run_if(in_state(AppState::Hosting)),
-        );
-
-        app.add_systems(
-            Update,
-            apply_username_messages.run_if(in_state(AppState::Hosting)),
         );
     }
 }
@@ -65,30 +59,6 @@ pub(crate) fn handle_connected(
         .id();
 
     info!("Create player entity {entity:?} for client {client_id:?}");
-}
-
-pub(crate) fn apply_username_messages(
-    mut receivers: Query<(Entity, &mut MessageReceiver<SetUsername>), With<ClientOf>>,
-    mut players: Query<(&ControlledBy, &mut PlayerUsername)>,
-) {
-    for (link_entity, mut receiver) in &mut receivers {
-        for message in receiver.receive() {
-            let Ok(name) = validate_username(&message.name) else {
-                warn!(
-                    "ignored invalid username from {:?}: {:?}",
-                    link_entity, message.name
-                );
-                continue;
-            };
-
-            let (_, mut username) = players
-                .iter_mut()
-                .find(|(controlled_by, _)| controlled_by.owner == link_entity)
-                .expect("connected client should have a player");
-            info!("set username for {link_entity:?} to {name}");
-            username.0 = name;
-        }
-    }
 }
 
 pub(crate) fn authoritative_player_movement(
@@ -127,7 +97,7 @@ pub(crate) fn update_player_aim_direction(
         &mut PlayerAimDirection,
         Has<Predicted>,
     )>,
-    host_server: Query<(), With<lightyear::connection::host::HostServer>>,
+    host_server: Query<(), With<HostServer>>,
 ) {
     let is_host_server = !host_server.is_empty();
 
