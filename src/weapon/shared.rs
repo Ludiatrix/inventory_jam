@@ -1,4 +1,30 @@
-use crate::weapon::protocol::WeaponKind;
+use bevy::{
+    ecs::{
+        name::Name,
+        query::{Has, With},
+        system::{Commands, Query, Res},
+    },
+    math::Vec2,
+};
+use leafwing_input_manager::action_state::ActionState;
+use lightyear::{
+    connection::network_target::NetworkTarget,
+    core::{tick::TickDuration, timeline::LocalTimeline},
+    prediction::Predicted,
+    prelude::Replicate,
+};
+
+use crate::{
+    player::{PlayerAimDirection, PlayerId, PlayerPosition},
+    projectile::{
+        PlayerProjectile,
+        shared::{
+            ProjectileLifetime, ProjectilePosition, ServerProjectile, projectile_spawn_position,
+        },
+    },
+    protocol::{inputs::PlayerAction, rooms::GameRoom},
+    weapon::protocol::{EquippedWeapon, WeaponCooldown, WeaponKind},
+};
 
 /// Authoritative combat values resolved from an equipped weapon.
 ///
@@ -44,5 +70,83 @@ pub fn weapon_stats(kind: WeaponKind, level: u32) -> WeaponStats {
             projectile_speed_per_tick: 16.0,
             projectile_radius: 14.0,
         },
+    }
+}
+
+/// Converts player fire input into authoritative replicated projectiles.
+///
+/// Damage, range, speed, and radius are snapshotted into the projectile when it
+/// is fired. Changing weapons afterward cannot retroactively alter an existing
+/// projectile.
+pub(crate) fn fire_equipped_weapons(
+    mut commands: Commands,
+    mut players: Query<(
+        &PlayerId,
+        &PlayerPosition,
+        &PlayerAimDirection,
+        &GameRoom,
+        &ActionState<PlayerAction>,
+        &EquippedWeapon,
+        &mut WeaponCooldown,
+        Has<Predicted>,
+    )>,
+    host_server: Query<(), With<lightyear::connection::host::HostServer>>,
+    local_timeline: Res<LocalTimeline>,
+    tick_duration: Res<TickDuration>,
+) {
+    let is_host_server = !host_server.is_empty();
+
+    for (
+        player_id,
+        player_position,
+        aim_direction,
+        room,
+        actions,
+        equipped_weapon,
+        mut cooldown,
+        predicted,
+    ) in &mut players
+    {
+        if is_host_server && predicted {
+            continue;
+        }
+
+        // `pressed` allows attack speed to control automatic repeat while the
+        // button is held. Use `just_pressed` here instead for semi-auto weapons.
+        if !actions.pressed(&PlayerAction::Fire) || !cooldown.is_ready(local_timeline.tick()) {
+            continue;
+        }
+
+        let direction = aim_direction.0.normalize_or_zero();
+        if direction == Vec2::ZERO {
+            continue;
+        }
+
+        let stats = weapon_stats(equipped_weapon.kind, equipped_weapon.level);
+        let spawn_position =
+            projectile_spawn_position(player_position.0, direction, stats.projectile_radius);
+
+        let projectile = PlayerProjectile {
+            owner: player_id.0,
+            weapon: equipped_weapon.kind,
+            origin: spawn_position,
+            direction,
+            speed_per_tick: stats.projectile_speed_per_tick,
+            damage: stats.damage,
+            max_range: stats.range,
+            radius: stats.projectile_radius,
+        };
+
+        commands.spawn((
+            projectile,
+            ProjectilePosition(spawn_position),
+            ProjectileLifetime::from_projectile(&projectile),
+            ServerProjectile,
+            *room,
+            Replicate::to_clients(NetworkTarget::All),
+            Name::new("Server Projectile"),
+        ));
+
+        cooldown.restart(&local_timeline, &tick_duration, stats.attacks_per_second);
     }
 }
