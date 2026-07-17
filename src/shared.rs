@@ -1,10 +1,12 @@
-use crate::protocol::ProtocolPlugin;
+use crate::{app::AppState, protocol::ProtocolPlugin};
 use bevy::prelude::*;
 
 pub static ARENA_WORLD_BOUNDS: Rect =
     Rect::from_center_size(Vec2::new(0.0, 0.0), Vec2::new(1600.0, 1200.0));
 pub static SHOP_WORLD_BOUNDS: Rect =
     Rect::from_center_size(Vec2::new(1700.0, 0.0), Vec2::new(1600.0, 1200.0));
+
+pub const GAME_NAME: &str = "Arena of Chapions";
 
 #[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FixedGameplaySet {
@@ -29,5 +31,17 @@ impl Plugin for SharedPlugin {
             )
                 .chain(),
         );
+        app.add_systems(FixedUpdate, update_window_title);
+    }
+}
+
+fn update_window_title(mut window_query: Query<&mut Window>, state: Res<State<AppState>>) {
+    for mut window in window_query.iter_mut() {
+        match state.get() {
+            AppState::MainMenu => (),
+            AppState::Connecting => (),
+            AppState::Playing => (),
+            AppState::Hosting => window.title = format!("{}: Server", GAME_NAME),
+        }
     }
 }

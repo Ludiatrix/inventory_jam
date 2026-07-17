@@ -83,6 +83,8 @@ fn base_app() -> App {
 
     #[cfg(feature = "gui")]
     {
+        use crate::shared::GAME_NAME;
+
         app.add_plugins(
             DefaultPlugins
                 .build()
@@ -93,7 +95,7 @@ fn base_app() -> App {
                 .set(log_plugin())
                 .set(WindowPlugin {
                     primary_window: Some(Window {
-                        title: env!("CARGO_PKG_NAME").into(),
+                        title: GAME_NAME.to_owned(),
                         resolution: (1024, 768).into(),
                         present_mode: PresentMode::AutoVsync,
                         prevent_default_event_handling: true,
