@@ -1,6 +1,5 @@
-use crate::weapon::protocol;
 use bevy::prelude::*;
-use lightyear::prelude::*;
+use lightyear::{core::tick::TickDuration, prelude::*};
 use serde::{Deserialize, Serialize};
 
 /// Installs weapon component registration on every peer before connections are
@@ -9,7 +8,8 @@ pub struct WeaponProtocolPlugin;
 
 impl Plugin for WeaponProtocolPlugin {
     fn build(&self, app: &mut App) {
-        protocol::register(app);
+        app.component::<EquippedWeapon>().replicate();
+        app.component::<WeaponCooldown>().replicate();
     }
 }
 
@@ -40,6 +40,24 @@ impl EquippedWeapon {
     }
 }
 
-pub fn register(app: &mut App) {
-    app.component::<EquippedWeapon>().replicate();
+/// Server-only firing state attached to an authoritative player entity.
+#[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, Default)]
+pub struct WeaponCooldown {
+    pub cooldown_tick: Tick,
+}
+
+impl WeaponCooldown {
+    pub fn is_ready(&self, current_tick: Tick) -> bool {
+        self.cooldown_tick < current_tick
+    }
+
+    pub fn restart(
+        &mut self,
+        local_timeline: &LocalTimeline,
+        tick_duration: &TickDuration,
+        attacks_per_second: f32,
+    ) {
+        let ticks_per_attack = 1.0 / (attacks_per_second * tick_duration.0.as_secs_f32());
+        self.cooldown_tick = local_timeline.tick() + Tick(ticks_per_attack.ceil() as u32);
+    }
 }

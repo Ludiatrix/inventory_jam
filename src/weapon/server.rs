@@ -14,8 +14,8 @@ use crate::{
         self as projectile_shared, ProjectileLifetime, ProjectilePosition, ServerProjectile,
     },
     weapon::{
-        protocol::{EquippedWeapon, WeaponKind},
-        shared::{WeaponCooldown, weapon_stats},
+        protocol::{EquippedWeapon, WeaponCooldown, WeaponKind},
+        shared::weapon_stats,
     },
 };
 

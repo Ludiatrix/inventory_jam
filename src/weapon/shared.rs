@@ -1,9 +1,3 @@
-use bevy::prelude::*;
-use lightyear::core::{
-    tick::{Tick, TickDuration},
-    timeline::LocalTimeline,
-};
-
 use crate::weapon::protocol::WeaponKind;
 
 /// Authoritative combat values resolved from an equipped weapon.
@@ -18,28 +12,6 @@ pub struct WeaponStats {
     pub attacks_per_second: f32,
     pub projectile_speed_per_tick: f32,
     pub projectile_radius: f32,
-}
-
-/// Server-only firing state attached to an authoritative player entity.
-#[derive(Component, Clone, Copy, Debug, Default)]
-pub struct WeaponCooldown {
-    pub cooldown_tick: Tick,
-}
-
-impl WeaponCooldown {
-    pub fn is_ready(&self, current_tick: Tick) -> bool {
-        self.cooldown_tick < current_tick
-    }
-
-    pub fn restart(
-        &mut self,
-        local_timeline: &LocalTimeline,
-        tick_duration: &TickDuration,
-        attacks_per_second: f32,
-    ) {
-        let ticks_per_attack = 1.0 / (attacks_per_second * tick_duration.0.as_secs_f32());
-        self.cooldown_tick = local_timeline.tick() + Tick(ticks_per_attack.ceil() as u32);
-    }
 }
 
 /// Returns the final stats for a weapon and level.
