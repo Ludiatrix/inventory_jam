@@ -1,8 +1,8 @@
 use crate::app::AppState;
-use crate::player::protocol::{PlayerAimDirection, PlayerBundle, PlayerPosition};
+use crate::player::protocol::{PlayerAimDirection, PlayerBundle};
+use crate::player::shared::player_movement;
 use crate::protocol::inputs::PlayerAction;
 use crate::protocol::rooms::{GameRoom, GameRooms};
-use crate::shared;
 use crate::shared::FixedGameplaySet;
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
@@ -19,7 +19,7 @@ impl Plugin for PlayerServerPlugin {
 
         app.add_systems(
             FixedUpdate,
-            (authoritative_player_movement, update_player_aim_direction)
+            (player_movement, update_player_aim_direction)
                 .chain()
                 .in_set(FixedGameplaySet::Player)
                 .run_if(in_state(AppState::Hosting)),
@@ -59,36 +59,6 @@ pub(crate) fn handle_connected(
         .id();
 
     info!("Create player entity {entity:?} for client {client_id:?}");
-}
-
-pub(crate) fn authoritative_player_movement(
-    timeline: Res<LocalTimeline>,
-    host_server: Query<(), With<HostServer>>,
-    mut position_query: Query<(
-        &mut PlayerPosition,
-        &GameRoom,
-        &ActionState<PlayerAction>,
-        Has<Predicted>,
-    )>,
-) {
-    let is_host_server = !host_server.is_empty();
-    let _tick = timeline.tick();
-
-    for (position, room, actions, predicted) in position_query.iter_mut() {
-        if is_host_server && predicted {
-            continue;
-        }
-
-        if actions.just_pressed(&PlayerAction::Fire) {
-            //info!(tick = tick.0, "SERVER received Fire");
-        }
-
-        if actions.just_pressed(&PlayerAction::Interact) {
-            //info!(tick = tick.0, "SERVER received Interact");
-        }
-
-        shared::shared_movement_behaviour(position, room, actions);
-    }
 }
 
 pub(crate) fn update_player_aim_direction(

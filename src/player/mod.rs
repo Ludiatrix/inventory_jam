@@ -5,6 +5,7 @@ mod protocol;
 mod render;
 #[cfg(feature = "server")]
 mod server;
+mod shared;
 
 use bevy::app::{App, Plugin};
 

@@ -1,13 +1,11 @@
 use crate::app::{AppState, LocalUsername};
 use crate::player::protocol::{
-    CachedCursorAim, PlayerAimDirection, PlayerColor, PlayerId, PlayerPosition,
-    SmoothedAimDirection,
+    CachedCursorAim, PlayerAimDirection, PlayerColor, PlayerId, SmoothedAimDirection,
 };
+use crate::player::shared::player_movement;
 use crate::protocol::channels::ClientEventsChannel;
 use crate::protocol::inputs::PlayerAction;
 use crate::protocol::messages::{DebugServerMessage, SetUsername};
-use crate::protocol::rooms::GameRoom;
-use crate::shared;
 use bevy::app::{App, FixedPreUpdate, FixedUpdate, Plugin, Update};
 use bevy::color::{Color, Hsva};
 use bevy::prelude::{
@@ -18,8 +16,7 @@ use leafwing_input_manager::input_map::InputMap;
 use lightyear::interpolation::Interpolated;
 use lightyear::prediction::Predicted;
 use lightyear::prelude::{
-    Client, Connected, Controlled, ControlledBy, InputTimeline, IsSynced, MessageReceiver,
-    MessageSender,
+    Client, Connected, Controlled, ControlledBy, MessageReceiver, MessageSender,
 };
 
 pub struct PlayerClientPlugin;
@@ -55,25 +52,6 @@ fn write_cursor_aim_to_leafwing(
     let (cached_aim, mut actions) = input_entity.into_inner();
 
     actions.set_axis_pair(&PlayerAction::Aim, cached_aim.0);
-}
-
-/// The client input only gets applied to predicted entities that we own
-/// This works because we only predict the user's controlled entity.
-/// If we were predicting more entities, we would have to only apply movement to the player owned one.
-fn player_movement(
-    synced_client: Query<(), (With<Client>, With<IsSynced<InputTimeline>>)>,
-    mut player_query: Query<
-        (&mut PlayerPosition, &GameRoom, &ActionState<PlayerAction>),
-        With<Predicted>,
-    >,
-) {
-    if synced_client.is_empty() {
-        return;
-    }
-
-    for (position, room, actions) in player_query.iter_mut() {
-        shared::shared_movement_behaviour(position, room, actions);
-    }
 }
 
 fn update_predicted_player_aim_direction(
