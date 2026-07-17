@@ -19,7 +19,7 @@ use lightyear::prediction::Predicted;
 use lightyear::prelude::Controlled;
 
 /// How quickly should the camera snap to the desired location
-const CAMERA_DECAY_RATE: f32 = 2.;
+const CAMERA_DECAY_RATE: f32 = 5.;
 const USERNAME_LABEL_OFFSET: Vec3 = Vec3::new(0.0, 40.0, 10.0);
 
 pub struct PlayerRenderPlugin;
