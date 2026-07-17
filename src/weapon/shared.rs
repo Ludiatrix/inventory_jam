@@ -1,4 +1,8 @@
 use bevy::prelude::*;
+use lightyear::core::{
+    tick::{Tick, TickDuration},
+    timeline::LocalTimeline,
+};
 
 use crate::weapon::protocol::WeaponKind;
 
@@ -19,20 +23,22 @@ pub struct WeaponStats {
 /// Server-only firing state attached to an authoritative player entity.
 #[derive(Component, Clone, Copy, Debug, Default)]
 pub struct WeaponCooldown {
-    pub remaining_seconds: f32,
+    pub cooldown_tick: Tick,
 }
 
 impl WeaponCooldown {
-    pub fn tick(&mut self, delta_seconds: f32) {
-        self.remaining_seconds = (self.remaining_seconds - delta_seconds).max(0.0);
+    pub fn is_ready(&self, current_tick: Tick) -> bool {
+        self.cooldown_tick < current_tick
     }
 
-    pub fn is_ready(&self) -> bool {
-        self.remaining_seconds <= 0.0
-    }
-
-    pub fn restart(&mut self, attacks_per_second: f32) {
-        self.remaining_seconds = 1.0 / attacks_per_second.max(0.01);
+    pub fn restart(
+        &mut self,
+        local_timeline: &LocalTimeline,
+        tick_duration: &TickDuration,
+        attacks_per_second: f32,
+    ) {
+        let ticks_per_attack = 1.0 / (attacks_per_second * tick_duration.0.as_secs_f32());
+        self.cooldown_tick = local_timeline.tick() + Tick(ticks_per_attack.ceil() as u32);
     }
 }
 

@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
+use lightyear::core::tick::TickDuration;
 use lightyear::prelude::*;
 
 use crate::app::AppState;
@@ -30,7 +31,6 @@ impl Plugin for WeaponServerPlugin {
             (
                 ensure_player_weapons,
                 ensure_weapon_cooldowns,
-                tick_weapon_cooldowns,
                 fire_equipped_weapons,
             )
                 .chain()
@@ -88,22 +88,6 @@ pub(crate) fn ensure_weapon_cooldowns(
     }
 }
 
-pub(crate) fn tick_weapon_cooldowns(
-    time: Res<Time>,
-    mut cooldowns: Query<(&mut WeaponCooldown, Has<Predicted>)>,
-    host_server: Query<(), With<lightyear::connection::host::HostServer>>,
-) {
-    let is_host_server = !host_server.is_empty();
-
-    for (mut cooldown, predicted) in &mut cooldowns {
-        if is_host_server && predicted {
-            continue;
-        }
-
-        cooldown.tick(time.delta_secs());
-    }
-}
-
 /// Converts player fire input into authoritative replicated projectiles.
 ///
 /// Damage, range, speed, and radius are snapshotted into the projectile when it
@@ -122,6 +106,8 @@ pub(crate) fn fire_equipped_weapons(
         Has<Predicted>,
     )>,
     host_server: Query<(), With<lightyear::connection::host::HostServer>>,
+    local_timeline: Res<LocalTimeline>,
+    tick_duration: Res<TickDuration>,
 ) {
     let is_host_server = !host_server.is_empty();
 
@@ -142,7 +128,7 @@ pub(crate) fn fire_equipped_weapons(
 
         // `pressed` allows attack speed to control automatic repeat while the
         // button is held. Use `just_pressed` here instead for semi-auto weapons.
-        if !actions.pressed(&PlayerAction::Fire) || !cooldown.is_ready() {
+        if !actions.pressed(&PlayerAction::Fire) || !cooldown.is_ready(local_timeline.tick()) {
             continue;
         }
 
@@ -179,6 +165,6 @@ pub(crate) fn fire_equipped_weapons(
             Name::new("Server Projectile"),
         ));
 
-        cooldown.restart(stats.attacks_per_second);
+        cooldown.restart(&local_timeline, &tick_duration, stats.attacks_per_second);
     }
 }
