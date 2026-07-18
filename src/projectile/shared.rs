@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use lightyear::{connection::network_target::NetworkTarget, prelude::Replicate};
+use lightyear::{connection::network_target::NetworkTarget, prelude::{InterpolationTarget, Replicate}};
 
 use crate::{
     enemy::{EnemyHealth, EnemyPosition, shared::ENEMY_COLLISION_RADIUS},
@@ -23,6 +23,7 @@ impl Command for SpawnProjectile {
             ProjectileLifetime::from_projectile(&self.projectile),
             self.room,
             Replicate::to_clients(NetworkTarget::All),
+            InterpolationTarget::to_clients(NetworkTarget::All),
             Name::new("Projectile"),
         ));
     }
