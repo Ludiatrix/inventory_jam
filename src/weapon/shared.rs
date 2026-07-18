@@ -133,6 +133,7 @@ pub(crate) fn fire_equipped_weapons(
             projectile,
             spawn_position,
             room: *room,
+            authoritative: is_host_server,
         });
 
         cooldown.restart(&local_timeline, &tick_duration, stats.attacks_per_second);

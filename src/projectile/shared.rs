@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use lightyear::{connection::network_target::NetworkTarget, prelude::{InterpolationTarget, Replicate}};
+use lightyear::{connection::network_target::NetworkTarget, prelude::{InterpolationTarget, PreSpawned, PredictionTarget, Replicate}};
 
 use crate::{
     enemy::{EnemyHealth, EnemyPosition, shared::ENEMY_COLLISION_RADIUS},
@@ -11,21 +11,29 @@ pub struct SpawnProjectile {
     pub projectile: PlayerProjectile,
     pub spawn_position: Vec2,
     pub room: GameRoom,
+    pub authoritative: bool,
 }
 
 impl Command for SpawnProjectile {
     type Out = ();
 
     fn apply(self, world: &mut World) -> Self::Out {
-        world.commands().spawn((
+        let mut binding = world.commands();
+        let mut entity = binding.spawn((
             self.projectile,
             ProjectilePosition(self.spawn_position),
             ProjectileLifetime::from_projectile(&self.projectile),
             self.room,
-            Replicate::to_clients(NetworkTarget::All),
-            InterpolationTarget::to_clients(NetworkTarget::All),
+            PreSpawned::default(),
             Name::new("Projectile"),
         ));
+
+        if self.authoritative {
+            entity.insert((
+                Replicate::to_clients(NetworkTarget::All),
+                PredictionTarget::to_clients(NetworkTarget::All),
+            ));
+        }
     }
 }
 

@@ -3,7 +3,7 @@ use crate::{
     projectile::protocol::{PlayerProjectile, ProjectileImpact, ProjectilePosition},
     weapon::protocol::WeaponKind,
 };
-use bevy::prelude::*;
+use bevy::{prelude::*, transform};
 
 pub struct ProjectileRenderPlugin;
 
@@ -74,17 +74,22 @@ fn load_projectile_visual_assets(
 fn ensure_projectile_sprites(
     mut commands: Commands,
     assets: Res<ProjectileVisualAssets>,
-    projectiles: Query<(Entity, &PlayerProjectile), Without<Sprite>>,
+    projectiles: Query<(Entity, &PlayerProjectile, &ProjectilePosition), Without<Sprite>>,
 ) {
-    for (entity, projectile) in &projectiles {
+    for (entity, projectile, position) in &projectiles {
         let (image, layout) = projectile_assets(projectile.weapon, &assets);
-
+        let direction = projectile.direction.normalize_or_zero();
         commands.entity(entity).insert((
             Sprite::from_atlas_image(image, TextureAtlas { layout, index: 0 }),
             SpriteAnimation {
                 first_frame: 0,
                 last_frame: 3,
                 timer: Timer::from_seconds(0.08, TimerMode::Repeating),
+            },
+            Transform {
+                translation: position.extend(8.0),
+                rotation: Quat::from_rotation_z(direction.y.atan2(direction.x)),
+                scale: Vec3::splat(0.65),
             },
         ));
     }

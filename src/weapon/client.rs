@@ -17,10 +17,10 @@ impl Plugin for WeaponClientPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             FixedUpdate,
-            (fire_equipped_weapons,)
+            (fire_equipped_weapons)
                 .chain()
                 .in_set(FixedGameplaySet::Weapon)
-                .run_if(in_state(AppState::Hosting)),
+                .run_if(in_state(AppState::Playing)),
         );
     }
 }
