@@ -1,6 +1,5 @@
 use bevy::{
     ecs::{
-        name::Name,
         query::{Has, With},
         system::{Commands, Query, Res},
     },
@@ -8,20 +7,13 @@ use bevy::{
 };
 use leafwing_input_manager::action_state::ActionState;
 use lightyear::{
-    connection::network_target::NetworkTarget,
     core::{tick::TickDuration, timeline::LocalTimeline},
     prediction::Predicted,
-    prelude::Replicate,
 };
 
 use crate::{
     player::{PlayerAimDirection, PlayerId, PlayerPosition},
-    projectile::{
-        PlayerProjectile,
-        shared::{
-            ProjectileLifetime, ProjectilePosition, ServerProjectile, projectile_spawn_position,
-        },
-    },
+    projectile::{PlayerProjectile, SpawnProjectile, projectile_spawn_position},
     protocol::{inputs::PlayerAction, rooms::GameRoom},
     weapon::protocol::{EquippedWeapon, WeaponCooldown, WeaponKind},
 };
@@ -53,7 +45,7 @@ pub fn weapon_stats(kind: WeaponKind, level: u32) -> WeaponStats {
             damage: 20 + bonus_levels * 4,
             range: 360.0 + bonus_levels as f32 * 12.0,
             attacks_per_second: 2.5 + bonus_levels as f32 * 0.08,
-            projectile_speed_per_tick: 18.0,
+            projectile_speed_per_tick: 5.0,
             projectile_radius: 18.0,
         },
         WeaponKind::Spear => WeaponStats {
@@ -137,15 +129,11 @@ pub(crate) fn fire_equipped_weapons(
             radius: stats.projectile_radius,
         };
 
-        commands.spawn((
+        commands.queue(SpawnProjectile {
             projectile,
-            ProjectilePosition(spawn_position),
-            ProjectileLifetime::from_projectile(&projectile),
-            ServerProjectile,
-            *room,
-            Replicate::to_clients(NetworkTarget::All),
-            Name::new("Server Projectile"),
-        ));
+            spawn_position,
+            room: *room,
+        });
 
         cooldown.restart(&local_timeline, &tick_duration, stats.attacks_per_second);
     }

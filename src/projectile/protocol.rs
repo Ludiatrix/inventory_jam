@@ -9,6 +9,10 @@ impl Plugin for ProjectileProtocolPlugin {
     fn build(&self, app: &mut App) {
         app.component::<PlayerProjectile>().replicate();
         app.component::<ProjectileImpact>().replicate();
+        app.component::<ProjectilePosition>()
+            .replicate()
+            .predict()
+            .add_linear_interpolation();
     }
 }
 
@@ -34,4 +38,17 @@ pub struct ProjectileImpact {
     pub position: Vec2,
     pub weapon: WeaponKind,
     pub damage: u32,
+}
+
+/// If a projectile is "smart" (e.g. homing projectile), we want to
+/// synchronize the projectile position to avoid desync.
+#[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Deref, DerefMut)]
+pub struct ProjectilePosition(pub Vec2);
+
+impl Ease for ProjectilePosition {
+    fn interpolating_curve_unbounded(start: Self, end: Self) -> impl Curve<Self> {
+        FunctionCurve::new(Interval::UNIT, move |t| {
+            ProjectilePosition(Vec2::lerp(start.0, end.0, t))
+        })
+    }
 }

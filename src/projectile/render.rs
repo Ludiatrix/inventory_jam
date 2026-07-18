@@ -1,12 +1,6 @@
 use crate::{
     app::game_is_active,
-    projectile::{
-        protocol::{PlayerProjectile, ProjectileImpact},
-        shared::{
-            ClientImpactVisual, ClientProjectileVisual, ProjectilePosition, ServerImpact,
-            ServerProjectile,
-        },
-    },
+    projectile::protocol::{PlayerProjectile, ProjectileImpact, ProjectilePosition},
     weapon::protocol::WeaponKind,
 };
 use bevy::prelude::*;
@@ -22,7 +16,7 @@ impl Plugin for ProjectileRenderPlugin {
             (
                 ensure_projectile_sprites,
                 sync_projectile_sprites,
-                cleanup_projectile_sprites,
+                // cleanup_projectile_sprites,
                 ensure_impact_sprites,
                 sync_impact_sprites,
                 animate_weapon_effect_sprites,
@@ -40,12 +34,6 @@ struct ProjectileVisualAssets {
     sword_impact_image: Handle<Image>,
     sword_impact_layout: Handle<TextureAtlasLayout>,
 }
-
-#[derive(Component)]
-struct ProjectileSprite;
-
-#[derive(Component)]
-struct ImpactSprite;
 
 #[derive(Component)]
 struct SpriteAnimation {
@@ -86,21 +74,13 @@ fn load_projectile_visual_assets(
 fn ensure_projectile_sprites(
     mut commands: Commands,
     assets: Res<ProjectileVisualAssets>,
-    projectiles: Query<
-        (Entity, &PlayerProjectile),
-        (
-            Or<(With<ClientProjectileVisual>, With<ServerProjectile>)>,
-            Without<ProjectileSprite>,
-        ),
-    >,
+    projectiles: Query<(Entity, &PlayerProjectile), Without<Sprite>>,
 ) {
     for (entity, projectile) in &projectiles {
         let (image, layout) = projectile_assets(projectile.weapon, &assets);
 
         commands.entity(entity).insert((
             Sprite::from_atlas_image(image, TextureAtlas { layout, index: 0 }),
-            Transform::default(),
-            ProjectileSprite,
             SpriteAnimation {
                 first_frame: 0,
                 last_frame: 3,
@@ -111,10 +91,7 @@ fn ensure_projectile_sprites(
 }
 
 fn sync_projectile_sprites(
-    mut projectiles: Query<
-        (&ProjectilePosition, &PlayerProjectile, &mut Transform),
-        With<ProjectileSprite>,
-    >,
+    mut projectiles: Query<(&ProjectilePosition, &PlayerProjectile, &mut Transform)>,
 ) {
     for (position, projectile, mut transform) in &mut projectiles {
         let direction = projectile.direction.normalize_or_zero();
@@ -124,34 +101,21 @@ fn sync_projectile_sprites(
     }
 }
 
-fn cleanup_projectile_sprites(
-    mut commands: Commands,
-    projectiles: Query<
-        Entity,
-        (
-            With<ProjectileSprite>,
-            Without<ClientProjectileVisual>,
-            Without<ServerProjectile>,
-        ),
-    >,
-) {
-    for entity in &projectiles {
-        commands
-            .entity(entity)
-            .remove::<(ProjectileSprite, SpriteAnimation, Sprite, Transform)>();
-    }
-}
+// fn cleanup_projectile_sprites(
+//     mut commands: Commands,
+//     projectiles: Query<Entity, (With<ProjectileSprite>,)>,
+// ) {
+//     for entity in &projectiles {
+//         commands
+//             .entity(entity)
+//             .remove::<(ProjectileSprite, SpriteAnimation, Sprite, Transform)>();
+//     }
+// }
 
 fn ensure_impact_sprites(
     mut commands: Commands,
     assets: Res<ProjectileVisualAssets>,
-    impacts: Query<
-        (Entity, &ProjectileImpact),
-        (
-            Or<(With<ClientImpactVisual>, With<ServerImpact>)>,
-            Without<ImpactSprite>,
-        ),
-    >,
+    impacts: Query<(Entity, &ProjectileImpact), Without<Sprite>>,
 ) {
     for (entity, impact) in &impacts {
         let (image, layout) = impact_assets(impact.weapon, &assets);
@@ -159,7 +123,6 @@ fn ensure_impact_sprites(
         commands.entity(entity).insert((
             Sprite::from_atlas_image(image, TextureAtlas { layout, index: 0 }),
             Transform::default(),
-            ImpactSprite,
             SpriteAnimation {
                 first_frame: 0,
                 last_frame: 5,
@@ -169,9 +132,7 @@ fn ensure_impact_sprites(
     }
 }
 
-fn sync_impact_sprites(
-    mut impacts: Query<(&ProjectileImpact, &mut Transform), With<ImpactSprite>>,
-) {
+fn sync_impact_sprites(mut impacts: Query<(&ProjectileImpact, &mut Transform)>) {
     for (impact, mut transform) in &mut impacts {
         transform.translation = impact.position.extend(9.0);
         transform.scale = Vec3::splat(0.85);
