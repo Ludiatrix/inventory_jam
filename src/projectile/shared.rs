@@ -1,6 +1,9 @@
 use bevy::prelude::*;
 use lightyear::{
-    connection::network_target::NetworkTarget, core::timeline::LocalTimeline, prediction::despawn::PredictionDespawnCommandsExt, prelude::{InterpolationTarget, PreSpawned, PredictionTarget, Replicate},
+    connection::network_target::NetworkTarget,
+    core::timeline::LocalTimeline,
+    prediction::despawn::PredictionDespawnCommandsExt,
+    prelude::{InterpolationTarget, PreSpawned, PredictionTarget, Replicate},
 };
 
 use crate::{
@@ -37,22 +40,6 @@ impl Command for SpawnProjectile {
                 PredictionTarget::to_clients(NetworkTarget::All),
                 InterpolationTarget::to_clients(NetworkTarget::All),
             ));
-        }
-    }
-}
-
-#[derive(Component, Clone, Copy, Debug, PartialEq)]
-pub struct ProjectileLifetime {
-    pub remaining_ticks: u16,
-}
-
-impl ProjectileLifetime {
-    pub fn from_projectile(projectile: &PlayerProjectile) -> Self {
-        let travel_ticks =
-            (projectile.max_range / projectile.speed_per_tick.max(0.001)).ceil() as u32;
-
-        Self {
-            remaining_ticks: travel_ticks.saturating_add(2).min(u16::MAX as u32) as u16,
         }
     }
 }

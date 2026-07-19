@@ -4,7 +4,7 @@ use crate::{
     weapon::protocol::WeaponKind,
 };
 use bevy::{
-    app::{FixedUpdate, PostUpdate},
+    app::FixedUpdate,
     color::palettes::css::RED,
     log::info,
     prelude::{
@@ -14,14 +14,14 @@ use bevy::{
         Update, Vec3, Without,
     },
 };
-use lightyear::{core::timeline::LocalTimeline, prelude::PreSpawned};
+use lightyear::core::timeline::LocalTimeline;
 
 pub struct ProjectileRenderPlugin;
 
 impl Plugin for ProjectileRenderPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, load_projectile_visual_assets);
-        app.add_systems(PostUpdate, debug_projectile_position);
+        app.add_systems(FixedUpdate, debug_projectile_position);
         app.add_systems(
             Update,
             (
@@ -54,14 +54,11 @@ struct SpriteAnimation {
 }
 
 fn debug_projectile_position(
-    q: Query<(Entity, &ProjectilePosition, Option<&PreSpawned>)>,
+    q: Query<(Entity, &ProjectilePosition)>,
     mut gizmos: Gizmos,
     local_timeline: Res<LocalTimeline>,
 ) {
-    for (entity, position, prespawn) in q.iter() {
-        if let Some(prespawn) = prespawn {
-            // info!("Hash: {:?}", prespawn.hash);
-        }
+    for (entity, position) in q.iter() {
         info!(
             "Projectile Pos: {:?} {:?} {:?}",
             local_timeline.tick(),

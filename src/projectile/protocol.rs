@@ -68,8 +68,7 @@ impl ProjectileLifetime {
         let travel_ticks = (max_range / speed_per_tick.max(0.001)).ceil() as u32;
 
         Self {
-            expire_time: *current_tick
-                + Tick(travel_ticks.saturating_add(2).min(u16::MAX as u32) as u32),
+            expire_time: *current_tick + Tick(travel_ticks.saturating_add(2).min(u16::MAX as u32)),
         }
     }
 

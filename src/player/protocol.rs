@@ -32,6 +32,7 @@ impl Plugin for PlayerProtocolPlugin {
     }
 }
 
+#[allow(unused)]
 fn debug_player_position(
     q: Query<(Entity, &PlayerPosition, &ActionState<PlayerAction>)>,
     local_timeline: Res<LocalTimeline>,

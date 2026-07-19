@@ -41,7 +41,9 @@ impl EquippedWeapon {
 }
 
 /// Server-only firing state attached to an authoritative player entity.
-#[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Deref, DerefMut, Default)]
+#[derive(
+    Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Deref, DerefMut, Default,
+)]
 pub struct WeaponCooldown {
     pub cooldown_tick: Tick,
 }

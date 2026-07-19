@@ -1,19 +1,20 @@
 use bevy::{
-    ecs::{
-        query::{Has, With},
-        system::{Commands, Query, Res},
-    }, log::info, math::Vec2, state::state::State,
+    ecs::system::{Commands, Query, Res},
+    log::info,
+    math::Vec2,
+    state::state::State,
 };
 use leafwing_input_manager::action_state::ActionState;
-use lightyear::{
-    core::{tick::TickDuration, timeline::LocalTimeline},
-    prediction::Predicted,
-};
+use lightyear::core::{tick::TickDuration, timeline::LocalTimeline};
 
 use crate::{
-    app::AppState, player::{PlayerAimDirection, PlayerId, PlayerPosition}, projectile::{
+    app::AppState,
+    player::{PlayerAimDirection, PlayerId, PlayerPosition},
+    projectile::{
         PlayerProjectile, ProjectileLifetime, SpawnProjectile, projectile_spawn_position,
-    }, protocol::{inputs::PlayerAction, rooms::GameRoom}, weapon::protocol::{EquippedWeapon, WeaponCooldown, WeaponKind},
+    },
+    protocol::{inputs::PlayerAction, rooms::GameRoom},
+    weapon::protocol::{EquippedWeapon, WeaponCooldown, WeaponKind},
 };
 
 /// Authoritative combat values resolved from an equipped weapon.
@@ -83,15 +84,8 @@ pub(crate) fn fire_equipped_weapons(
     local_timeline: Res<LocalTimeline>,
     tick_duration: Res<TickDuration>,
 ) {
-    for (
-        player_id,
-        player_position,
-        aim_direction,
-        room,
-        actions,
-        equipped_weapon,
-        mut cooldown,
-    ) in &mut players
+    for (player_id, player_position, aim_direction, room, actions, equipped_weapon, mut cooldown) in
+        &mut players
     {
         // `pressed` allows attack speed to control automatic repeat while the
         // button is held. Use `just_pressed` here instead for semi-auto weapons.
