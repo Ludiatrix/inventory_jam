@@ -20,6 +20,16 @@ impl Plugin for EnemyProtocolPlugin {
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq, Reflect, Deref, DerefMut)]
 pub struct EnemyPosition(pub Vec2);
 
+impl EnemyPosition {
+    // Calculates squared distance to avoid expensive square root operations in loops
+    pub fn squared_distance(&self, other: &Vec2) -> f64 {
+        let dx = self.x - other.x;
+        let dy = self.y - other.y;
+        ((dx * dx) + (dy * dy)).into()
+    }
+}
+
+
 impl Ease for EnemyPosition {
     fn interpolating_curve_unbounded(start: Self, end: Self) -> impl Curve<Self> {
         FunctionCurve::new(Interval::UNIT, move |t| {
