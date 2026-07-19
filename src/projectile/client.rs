@@ -1,7 +1,10 @@
-use crate::app::ClientState;
-use crate::projectile::shared::{expire_server_impacts, simulate_server_projectiles};
-use crate::shared::FixedGameplaySet;
 use bevy::prelude::*;
+
+use crate::{
+    app::ClientState,
+    projectile::shared::simulate_predicted_projectiles,
+    shared::FixedGameplaySet,
+};
 
 pub struct ProjectileClientPlugin;
 
@@ -9,8 +12,7 @@ impl Plugin for ProjectileClientPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             FixedUpdate,
-            (simulate_server_projectiles, expire_server_impacts)
-                .chain()
+            simulate_predicted_projectiles
                 .in_set(FixedGameplaySet::Projectile)
                 .run_if(in_state(ClientState::Playing)),
         );

@@ -1,9 +1,6 @@
 use bevy::prelude::*;
 use lightyear::{
-    connection::network_target::NetworkTarget,
-    core::timeline::LocalTimeline,
-    prediction::despawn::PredictionDespawnCommandsExt,
-    prelude::{InterpolationTarget, PreSpawned, PredictionTarget, Replicate},
+    connection::network_target::NetworkTarget, core::timeline::LocalTimeline, prediction::{Predicted, despawn::PredictionDespawnCommandsExt}, prelude::{InterpolationTarget, PreSpawned, PredictionTarget, Replicate},
 };
 
 use crate::{
@@ -34,12 +31,19 @@ impl Command for SpawnProjectile {
         ));
 
         if self.is_authoritative {
-            info!("Adding projectile authoritative components");
-            entity.insert((
-                Replicate::to_clients(NetworkTarget::All),
-                PredictionTarget::to_clients(NetworkTarget::All),
-                InterpolationTarget::to_clients(NetworkTarget::All),
-            ));
+        let owner = self.projectile.owner;
+
+        entity.insert((
+            Replicate::to_clients(NetworkTarget::All),
+
+            // Only the client that fired the projectile predicts it.
+            PredictionTarget::to_clients(NetworkTarget::Single(owner)),
+
+            // Every other client receives an interpolated representation.
+            InterpolationTarget::to_clients(
+            NetworkTarget::AllExceptSingle(owner),
+            ),
+        ));
         }
     }
 }
@@ -90,41 +94,10 @@ pub fn simulate_server_projectiles(
     for (projectile_entity, projectile, mut position, room) in &mut projectiles {
         move_projectile(&mut position, projectile);
 
-        let mut hit_enemy = None;
-
-        for (enemy_entity, enemy_position, mut health) in &mut enemies {
-            if health.current == 0 {
-                continue;
-            }
-
-            let collision_radius = projectile.radius + ENEMY_COLLISION_RADIUS;
-            let hit = position.0.distance_squared(enemy_position.0)
-                <= collision_radius * collision_radius;
-
-            if !hit {
-                continue;
-            }
-
-            health.current = health.current.saturating_sub(projectile.damage);
-            hit_enemy = Some((enemy_entity, health.current == 0));
-            break;
-        }
+        let hit_enemy = get_hit_enemy(&mut enemies, projectile, &position);
 
         if let Some((enemy_entity, enemy_died)) = hit_enemy {
-            commands.spawn((
-                ProjectileImpact {
-                    position: position.0,
-                    weapon: projectile.weapon,
-                    damage: projectile.damage,
-                },
-                ImpactLifetime {
-                    remaining_ticks: IMPACT_LIFETIME_TICKS,
-                },
-                Replicate::to_clients(NetworkTarget::All),
-                Name::new("Server Projectile Impact"),
-            ));
-
-            commands.entity(projectile_entity).prediction_despawn();
+            spawn_projectile_impact(&mut commands, projectile_entity, projectile, &position);
 
             if enemy_died {
                 commands.entity(enemy_entity).despawn();
@@ -133,14 +106,93 @@ pub fn simulate_server_projectiles(
             continue;
         }
 
-        if projectile.expire_time.is_expired(&local_timeline.tick())
-            || projectile_reached_max_range(&position, projectile)
-            || projectile_is_outside_world(position.0, room)
-        {
-            info!("Despawning projectile: lifetime expired");
-            commands.entity(projectile_entity).prediction_despawn();
-        }
+        check_projectile_range(&mut commands, &local_timeline, projectile_entity, projectile, position, room);
     }
+}
+
+/// Advances only locally predicted projectiles.
+pub fn simulate_predicted_projectiles(
+    mut commands: Commands,
+    mut projectiles: Query<
+        (
+            Entity,
+            &PlayerProjectile,
+            &mut ProjectilePosition,
+            &GameRoom,
+        ),
+        With<Predicted>,
+    >,
+    local_timeline: Res<LocalTimeline>,
+) {
+    for (entity, projectile, mut position, room) in &mut projectiles {
+        move_projectile(&mut position, projectile);
+        check_projectile_range(&mut commands, &local_timeline, entity, projectile, position, room);
+    }
+}
+
+fn check_projectile_range(commands: &mut Commands<'_, '_>, local_timeline: &Res<'_, LocalTimeline>, projectile_entity: Entity, projectile: &PlayerProjectile, position: Mut<'_, ProjectilePosition>, room: &GameRoom) {
+    if projectile
+        .expire_time
+        .is_expired(&local_timeline.tick())
+        || projectile_reached_max_range(&position, projectile)
+        || projectile_is_outside_world(position.0, room)
+    {
+        commands
+            .entity(projectile_entity)
+            .prediction_despawn();
+    }
+}
+
+fn spawn_projectile_impact(commands: &mut Commands<'_, '_>, projectile_entity: Entity, projectile: &PlayerProjectile, position: &Mut<'_, ProjectilePosition>) {
+    commands.spawn((
+        ProjectileImpact {
+            position: position.0,
+            weapon: projectile.weapon,
+            damage: projectile.damage,
+        },
+        ImpactLifetime {
+            remaining_ticks: IMPACT_LIFETIME_TICKS,
+        },
+        Replicate::to_clients(NetworkTarget::All),
+        Name::new("Server Projectile Impact"),
+    ));
+
+    commands
+        .entity(projectile_entity)
+        .prediction_despawn();
+}
+
+fn get_hit_enemy(enemies: &mut Query<'_, '_, (Entity, &EnemyPosition, &mut EnemyHealth)>, projectile: &PlayerProjectile, position: &Mut<'_, ProjectilePosition>) -> Option<(Entity, bool)> {
+    let mut hit_enemy = None;
+
+    for (enemy_entity, enemy_position, mut health) in enemies {
+        if health.current == 0 {
+            continue;
+        }
+
+        let collision_radius =
+            projectile.radius + ENEMY_COLLISION_RADIUS;
+
+        let hit = position
+            .0
+            .distance_squared(enemy_position.0)
+            <= collision_radius * collision_radius;
+
+        if !hit {
+            continue;
+        }
+
+        health.current =
+            health.current.saturating_sub(projectile.damage);
+
+        hit_enemy = Some((
+            enemy_entity,
+            health.current == 0,
+        ));
+
+        break;
+    }
+    hit_enemy
 }
 
 pub fn expire_server_impacts(
