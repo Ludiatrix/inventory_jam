@@ -20,6 +20,9 @@
             "type": "cargo",
             "command": "run",
             "args": ["--", "--mode", "host"],
+            "env": {
+                "RUST_LOG": "lightyear_prediction=debug"
+            },
             "isBackground": true,
             "problemMatcher": [],
             "presentation": {
@@ -33,6 +36,9 @@
             "type": "cargo",
             "command": "run",
             "args": ["--", "--mode", "local", "--user", "Player1"],
+            "env": {
+                "RUST_LOG": "lightyear_prediction=debug"
+            },
             "isBackground": true,
             "problemMatcher": [],
             "presentation": {
@@ -46,6 +52,9 @@
             "type": "cargo",
             "command": "run",
             "args": ["--", "--mode", "local", "--user", "Player2"],
+            "env": {
+                "RUST_LOG": "lightyear_prediction=debug"
+            },
             "isBackground": true,
             "problemMatcher": [],
             "presentation": {

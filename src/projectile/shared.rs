@@ -1,5 +1,7 @@
 use bevy::prelude::*;
-use lightyear::{connection::network_target::NetworkTarget, prelude::{InterpolationTarget, PreSpawned, PredictionTarget, Replicate}};
+use lightyear::{
+    connection::network_target::NetworkTarget, core::timeline::LocalTimeline, prediction::despawn::PredictionDespawnCommandsExt, prelude::{InterpolationTarget, PreSpawned, PredictionTarget, Replicate},
+};
 
 use crate::{
     enemy::{EnemyHealth, EnemyPosition, shared::ENEMY_COLLISION_RADIUS},
@@ -11,27 +13,29 @@ pub struct SpawnProjectile {
     pub projectile: PlayerProjectile,
     pub spawn_position: Vec2,
     pub room: GameRoom,
-    pub authoritative: bool,
+    pub is_authoritative: bool,
 }
 
 impl Command for SpawnProjectile {
     type Out = ();
 
     fn apply(self, world: &mut World) -> Self::Out {
+        info!("Spawning projectile");
         let mut binding = world.commands();
         let mut entity = binding.spawn((
             self.projectile,
             ProjectilePosition(self.spawn_position),
-            ProjectileLifetime::from_projectile(&self.projectile),
             self.room,
             PreSpawned::default(),
             Name::new("Projectile"),
         ));
 
-        if self.authoritative {
+        if self.is_authoritative {
+            info!("Adding projectile authoritative components");
             entity.insert((
                 Replicate::to_clients(NetworkTarget::All),
                 PredictionTarget::to_clients(NetworkTarget::All),
+                InterpolationTarget::to_clients(NetworkTarget::All),
             ));
         }
     }
@@ -78,7 +82,7 @@ pub fn move_projectile(position: &mut ProjectilePosition, projectile: &PlayerPro
 }
 
 pub fn projectile_reached_max_range(
-    position: ProjectilePosition,
+    position: &ProjectilePosition,
     projectile: &PlayerProjectile,
 ) -> bool {
     position.0.distance_squared(projectile.origin) >= projectile.max_range * projectile.max_range
@@ -91,12 +95,12 @@ pub fn simulate_server_projectiles(
         Entity,
         &PlayerProjectile,
         &mut ProjectilePosition,
-        &mut ProjectileLifetime,
         &GameRoom,
     )>,
     mut enemies: Query<(Entity, &EnemyPosition, &mut EnemyHealth)>,
+    local_timeline: Res<LocalTimeline>,
 ) {
-    for (projectile_entity, projectile, mut position, mut lifetime, room) in &mut projectiles {
+    for (projectile_entity, projectile, mut position, room) in &mut projectiles {
         move_projectile(&mut position, projectile);
 
         let mut hit_enemy = None;
@@ -133,7 +137,7 @@ pub fn simulate_server_projectiles(
                 Name::new("Server Projectile Impact"),
             ));
 
-            commands.entity(projectile_entity).despawn();
+            commands.entity(projectile_entity).prediction_despawn();
 
             if enemy_died {
                 commands.entity(enemy_entity).despawn();
@@ -142,13 +146,12 @@ pub fn simulate_server_projectiles(
             continue;
         }
 
-        lifetime.remaining_ticks = lifetime.remaining_ticks.saturating_sub(1);
-
-        if lifetime.remaining_ticks == 0
-            || projectile_reached_max_range(*position, projectile)
+        if projectile.expire_time.is_expired(&local_timeline.tick())
+            || projectile_reached_max_range(&position, projectile)
             || projectile_is_outside_world(position.0, room)
         {
-            commands.entity(projectile_entity).despawn();
+            info!("Despawning projectile: lifetime expired");
+            commands.entity(projectile_entity).prediction_despawn();
         }
     }
 }

@@ -3,14 +3,25 @@ use crate::{
     projectile::protocol::{PlayerProjectile, ProjectileImpact, ProjectilePosition},
     weapon::protocol::WeaponKind,
 };
-use bevy::{prelude::*, transform};
+use bevy::{
+    app::{FixedUpdate, PostUpdate},
+    color::palettes::css::RED,
+    log::info,
+    prelude::{
+        App, AssetServer, Assets, Commands, Component, Entity, Gizmos, Handle, Image,
+        IntoScheduleConfigs, Isometry2d, Plugin, Quat, Query, Res, ResMut, Resource, Sprite,
+        Startup, TextureAtlas, TextureAtlasLayout, Time, Timer, TimerMode, Transform, UVec2,
+        Update, Vec3, Without,
+    },
+};
+use lightyear::{core::timeline::LocalTimeline, prelude::PreSpawned};
 
 pub struct ProjectileRenderPlugin;
 
 impl Plugin for ProjectileRenderPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, load_projectile_visual_assets);
-
+        app.add_systems(PostUpdate, debug_projectile_position);
         app.add_systems(
             Update,
             (
@@ -40,6 +51,25 @@ struct SpriteAnimation {
     first_frame: usize,
     last_frame: usize,
     timer: Timer,
+}
+
+fn debug_projectile_position(
+    q: Query<(Entity, &ProjectilePosition, Option<&PreSpawned>)>,
+    mut gizmos: Gizmos,
+    local_timeline: Res<LocalTimeline>,
+) {
+    for (entity, position, prespawn) in q.iter() {
+        if let Some(prespawn) = prespawn {
+            // info!("Hash: {:?}", prespawn.hash);
+        }
+        info!(
+            "Projectile Pos: {:?} {:?} {:?}",
+            local_timeline.tick(),
+            position,
+            entity
+        );
+        gizmos.circle_2d(Isometry2d::from_xy(position.x, position.y), 5.0, RED);
+    }
 }
 
 fn load_projectile_visual_assets(
