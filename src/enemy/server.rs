@@ -1,4 +1,4 @@
-use crate::app::AppState;
+use crate::app::ServerState;
 use crate::enemy::api::SpawnEnemy;
 use crate::enemy::protocol::{EnemyHealth, EnemyPosition};
 use bevy::prelude::*;
@@ -12,12 +12,32 @@ pub struct EnemyServerPlugin;
 
 impl Plugin for EnemyServerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(FixedUpdate, (
-            spawn_debug_enemy.run_if(in_state(AppState::Hosting)),
-            spawn_requested_enemy.run_if(in_state(AppState::Playing)),
-        ));
         app.add_message::<SpawnEnemy>();
+
+        app.configure_sets(
+            FixedUpdate,
+            (
+                EnemySpawnSet::Request,
+                EnemySpawnSet::Spawn,
+            )
+                .chain(),
+        );
+
+        app.add_systems(
+            FixedUpdate,
+            (
+                spawn_debug_enemy,
+                spawn_requested_enemy.in_set(EnemySpawnSet::Spawn),
+            )
+                .run_if(in_state(ServerState::Hosting)),
+        );
     }
+}
+
+#[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum EnemySpawnSet {
+    Request,
+    Spawn,
 }
 
 /// The only system that converts pool requests into authoritative replicated
@@ -55,8 +75,7 @@ fn spawn_enemy(commands: &mut Commands, spawn_position: Vec2) -> Entity {
             Replicate::to_clients(NetworkTarget::All),
             InterpolationTarget::to_clients(NetworkTarget::All),
             Name::new("Enemy"),
-        ))
-        .id();
+        )).id();
 
     entity
 }
@@ -68,6 +87,5 @@ fn get_random_position() -> Vec2 {
         .random_range(0.0..=ENEMY_SPAWN_RADIUS * ENEMY_SPAWN_RADIUS)
         .sqrt();
     let position = Vec2::new(angle.cos(), angle.sin()) * radius;
-
     position
 }

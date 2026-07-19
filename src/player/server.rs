@@ -1,4 +1,4 @@
-use crate::app::AppState;
+use crate::app::ServerState;
 use crate::player::protocol::{PlayerAimDirection, PlayerBundle};
 use crate::player::shared::player_movement;
 use crate::protocol::inputs::PlayerAction;
@@ -22,12 +22,12 @@ impl Plugin for PlayerServerPlugin {
             (player_movement, update_player_aim_direction)
                 .chain()
                 .in_set(FixedGameplaySet::Player)
-                .run_if(in_state(AppState::Hosting)),
+                .run_if(in_state(ServerState::Hosting)),
         );
 
         app.add_systems(
             FixedUpdate,
-            debug_switch_rooms.run_if(in_state(AppState::Hosting)),
+            debug_switch_rooms.run_if(in_state(ServerState::Hosting)),
         );
     }
 }

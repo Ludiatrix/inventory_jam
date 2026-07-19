@@ -9,7 +9,7 @@ use bevy::{
     state::condition::in_state,
 };
 
-use crate::{app::AppState, shared::FixedGameplaySet, weapon::shared::fire_equipped_weapons};
+use crate::{app::ClientState, shared::FixedGameplaySet, weapon::shared::fire_equipped_weapons};
 
 pub struct WeaponClientPlugin;
 
@@ -20,7 +20,7 @@ impl Plugin for WeaponClientPlugin {
             (fire_equipped_weapons)
                 .chain()
                 .in_set(FixedGameplaySet::Weapon)
-                .run_if(in_state(AppState::Playing)),
+                .run_if(in_state(ClientState::Playing)),
         );
     }
 }

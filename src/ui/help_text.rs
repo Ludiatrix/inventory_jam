@@ -1,4 +1,4 @@
-use crate::app::AppState;
+use crate::app::ClientState;
 use bevy::prelude::*;
 
 #[derive(Clone)]
@@ -7,8 +7,8 @@ pub struct HelpTextPlugin;
 impl Plugin for HelpTextPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, init);
-        app.add_systems(OnEnter(AppState::Playing), setup_instructions);
-        app.add_systems(OnExit(AppState::Playing), cleanup_instructions);
+        app.add_systems(OnEnter(ClientState::Playing), setup_instructions);
+        app.add_systems(OnExit(ClientState::Playing), cleanup_instructions);
     }
 }
 

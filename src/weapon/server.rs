@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use lightyear::prelude::*;
 
-use crate::app::AppState;
+use crate::app::ServerState;
 use crate::player::PlayerId;
 use crate::shared::FixedGameplaySet;
 use crate::weapon::protocol::{EquippedWeapon, WeaponCooldown, WeaponKind};
@@ -19,7 +19,7 @@ impl Plugin for WeaponServerPlugin {
             (ensure_player_weapons, fire_equipped_weapons)
                 .chain()
                 .in_set(FixedGameplaySet::Weapon)
-                .run_if(in_state(AppState::Hosting)),
+                .run_if(in_state(ServerState::Hosting)),
         );
     }
 }

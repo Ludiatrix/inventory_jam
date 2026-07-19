@@ -1,6 +1,6 @@
 //! Main menu UI: username entry and connection actions.
 
-use crate::app::{AppState, LaunchMode, LocalUsername, MAX_USERNAME_LEN, StartGame};
+use crate::app::{ClientState, LaunchMode, LocalUsername, MAX_USERNAME_LEN, StartGame};
 use crate::networking::ConnectionStatus;
 use bevy::color::palettes::tailwind::{SLATE_300, SLATE_700, SLATE_900};
 use bevy::input_focus::AutoFocus;
@@ -35,14 +35,14 @@ pub struct MenuPlugin;
 impl Plugin for MenuPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(TabNavigationPlugin);
-        app.add_systems(OnEnter(AppState::MainMenu), spawn_main_menu);
-        app.add_systems(OnEnter(AppState::Connecting), spawn_connecting_overlay);
-        app.add_systems(OnExit(AppState::MainMenu), despawn_menu_ui);
-        app.add_systems(OnExit(AppState::Connecting), despawn_menu_ui);
+        app.add_systems(OnEnter(ClientState::Disconnected), spawn_main_menu);
+        app.add_systems(OnEnter(ClientState::Connecting), spawn_connecting_overlay);
+        app.add_systems(OnExit(ClientState::Disconnected), despawn_menu_ui);
+        app.add_systems(OnExit(ClientState::Connecting), despawn_menu_ui);
         app.add_systems(
             Update,
             (style_menu_buttons, handle_menu_buttons, sync_status_text)
-                .run_if(in_state(AppState::MainMenu).or_else(in_state(AppState::Connecting))),
+                .run_if(in_state(ClientState::Disconnected).or_else(in_state(ClientState::Connecting))),
         );
     }
 }

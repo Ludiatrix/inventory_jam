@@ -8,7 +8,7 @@ use leafwing_input_manager::action_state::ActionState;
 use lightyear::core::{tick::TickDuration, timeline::LocalTimeline};
 
 use crate::{
-    app::AppState,
+    app::ServerState,
     player::{PlayerAimDirection, PlayerId, PlayerPosition},
     projectile::{
         PlayerProjectile, ProjectileLifetime, SpawnProjectile, projectile_spawn_position,
@@ -80,7 +80,7 @@ pub(crate) fn fire_equipped_weapons(
         &EquippedWeapon,
         &mut WeaponCooldown,
     )>,
-    app_state: Res<State<AppState>>,
+    app_state: Res<State<ServerState>>,
     local_timeline: Res<LocalTimeline>,
     tick_duration: Res<TickDuration>,
 ) {
@@ -125,7 +125,7 @@ pub(crate) fn fire_equipped_weapons(
             projectile,
             spawn_position,
             room: *room,
-            is_authoritative: matches!(app_state.get(), AppState::Hosting),
+            is_authoritative: matches!(app_state.get(), ServerState::Hosting),
         });
 
         cooldown.restart(&local_timeline, &tick_duration, stats.attacks_per_second);

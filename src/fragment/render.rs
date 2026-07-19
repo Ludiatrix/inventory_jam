@@ -1,4 +1,4 @@
-use crate::app::{AppState, game_is_active};
+use crate::app::{ClientState, game_is_active};
 use crate::fragment::{
     render,
     shared::{self as fragment_shared, FragmentPosition},
@@ -12,9 +12,9 @@ pub struct FragmentRenderPlugin;
 
 impl Plugin for FragmentRenderPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::Playing), render::setup_fragment_balance);
+        app.add_systems(OnEnter(ClientState::Playing), render::setup_fragment_balance);
         app.add_systems(
-            OnExit(AppState::Playing),
+            OnExit(ClientState::Playing),
             |mut commands: Commands, texts: Query<Entity, With<render::FragmentBalanceText>>| {
                 for entity in &texts {
                     commands.entity(entity).despawn();
@@ -25,7 +25,7 @@ impl Plugin for FragmentRenderPlugin {
         app.add_systems(Update, render::draw_fragments.run_if(game_is_active));
         app.add_systems(
             Update,
-            render::update_fragment_balance.run_if(in_state(AppState::Playing)),
+            render::update_fragment_balance.run_if(in_state(ClientState::Playing)),
         );
     }
 }

@@ -1,4 +1,4 @@
-use crate::app::{AppState, game_is_active};
+use crate::app::{ClientState, game_is_active};
 use crate::player::protocol::{
     CachedCursorAim, PlayerAimDirection, PlayerPosition, SmoothedAimDirection,
 };
@@ -30,19 +30,19 @@ impl Plugin for PlayerRenderPlugin {
         app.add_systems(Update, (sync_username_labels).run_if(game_is_active));
         app.add_systems(
             Update,
-            draw_local_aimstick.run_if(in_state(AppState::Playing)),
+            draw_local_aimstick.run_if(in_state(ClientState::Playing)),
         );
         app.add_systems(
             Update,
             (update_camera, sample_cursor_aim)
                 .chain()
-                .run_if(in_state(AppState::Playing)),
+                .run_if(in_state(ClientState::Playing)),
         );
         app.add_systems(
             Update,
             (smooth_local_aim_visual)
                 .chain()
-                .run_if(in_state(AppState::Playing)),
+                .run_if(in_state(ClientState::Playing)),
         );
     }
 }

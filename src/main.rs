@@ -29,9 +29,10 @@ use projectile::ProjectilePlugin;
 use server::ExampleServerPlugin;
 use shared::SharedPlugin;
 use std::time::Duration;
-use ui::UiPlugin;
 use weapon::WeaponPlugin;
 use world::WorldPlugin;
+
+use crate::ui::UiPlugin;
 
 const TICK_DURATION: Duration =
     Duration::from_nanos((1_000_000_000.0 / networking::FIXED_TIMESTEP_HZ) as u64);
@@ -55,7 +56,11 @@ fn main() {
         tick_duration: TICK_DURATION,
     });
 
-    app.insert_state(AppState::MainMenu);
+    #[cfg(feature = "client")]
+    app.init_state::<ClientState>();
+
+    #[cfg(feature = "server")]
+    app.init_state::<ServerState>();
 
     app.add_plugins((
         WorldPlugin,
@@ -69,6 +74,7 @@ fn main() {
         FragmentPlugin,
         PersistencePlugin,
     ));
+    
     networking::configure_networking(&mut app);
 
     #[cfg(feature = "server")]

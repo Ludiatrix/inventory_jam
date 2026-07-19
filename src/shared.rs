@@ -1,4 +1,4 @@
-use crate::{app::AppState, protocol::ProtocolPlugin};
+use crate::{app::ServerState, protocol::ProtocolPlugin};
 use bevy::prelude::*;
 
 pub static ARENA_WORLD_BOUNDS: Rect =
@@ -31,17 +31,17 @@ impl Plugin for SharedPlugin {
             )
                 .chain(),
         );
+
+        #[cfg(feature = "server")]
         app.add_systems(FixedUpdate, update_window_title);
     }
 }
 
-fn update_window_title(mut window_query: Query<&mut Window>, state: Res<State<AppState>>) {
+fn update_window_title(mut window_query: Query<&mut Window>, state: Res<State<ServerState>>) {
     for mut window in window_query.iter_mut() {
         match state.get() {
-            AppState::MainMenu => (),
-            AppState::Connecting => (),
-            AppState::Playing => (),
-            AppState::Hosting => window.title = format!("{}: Server", GAME_NAME),
+            ServerState::Stopped => (),
+            ServerState::Hosting => window.title = format!("{}: Server", GAME_NAME),
         }
     }
 }

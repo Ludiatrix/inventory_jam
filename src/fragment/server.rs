@@ -1,4 +1,5 @@
-use crate::app::AppState;
+
+use crate::app::ServerState;
 use crate::fragment::api::SpawnFragmentPool;
 use crate::fragment::{
     protocol::Fragment,
@@ -38,7 +39,7 @@ impl Plugin for FragmentServerPlugin {
             )
                 .chain()
                 .before(FixedGameplaySet::Persistence)
-                .run_if(in_state(AppState::Hosting)),
+                .run_if(in_state(ServerState::Hosting)),
         );
     }
 }

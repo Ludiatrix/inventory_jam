@@ -1,9 +1,10 @@
 use bevy::prelude::*;
 
 use crate::{
-    app::AppState,
+    app::ServerState,
     enemy::{
         api::SpawnEnemy,
+        server::EnemySpawnSet,
         EnemyPosition,
     },
 };
@@ -25,7 +26,9 @@ impl Plugin for WorldServerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             FixedUpdate,
-            run_enemy_spawner.run_if(in_state(AppState::Playing)),
+            run_enemy_spawner
+                .in_set(EnemySpawnSet::Request)
+                .run_if(in_state(ServerState::Hosting)),
         );
     }
 }

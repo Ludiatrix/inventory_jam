@@ -1,4 +1,4 @@
-use crate::app::{AppState, LocalUsername};
+use crate::app::{ClientState, LocalUsername};
 use crate::player::protocol::{
     CachedCursorAim, PlayerAimDirection, PlayerColor, PlayerId, SmoothedAimDirection,
 };
@@ -25,16 +25,16 @@ impl Plugin for PlayerClientPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             FixedPreUpdate,
-            write_cursor_aim_to_leafwing.run_if(in_state(AppState::Playing)),
+            write_cursor_aim_to_leafwing.run_if(in_state(ClientState::Playing)),
         );
         app.add_systems(
             FixedUpdate,
             (player_movement, update_predicted_player_aim_direction)
                 .chain()
-                .run_if(in_state(AppState::Playing)),
+                .run_if(in_state(ClientState::Playing)),
         );
 
-        app.add_systems(Update, receive_message1.run_if(in_state(AppState::Playing)));
+        app.add_systems(Update, receive_message1.run_if(in_state(ClientState::Playing)));
 
         app.add_observer(handle_predicted_spawn);
         app.add_observer(handle_controlled_spawn);

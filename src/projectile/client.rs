@@ -1,4 +1,4 @@
-use crate::app::AppState;
+use crate::app::ClientState;
 use crate::projectile::shared::{expire_server_impacts, simulate_server_projectiles};
 use crate::shared::FixedGameplaySet;
 use bevy::prelude::*;
@@ -12,7 +12,7 @@ impl Plugin for ProjectileClientPlugin {
             (simulate_server_projectiles, expire_server_impacts)
                 .chain()
                 .in_set(FixedGameplaySet::Projectile)
-                .run_if(in_state(AppState::Playing)),
+                .run_if(in_state(ClientState::Playing)),
         );
     }
 }
