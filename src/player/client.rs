@@ -1,6 +1,7 @@
 use crate::app::{ClientState, LocalUsername};
 use crate::player::protocol::{
-    CachedCursorAim, PlayerAimDirection, PlayerColor, PlayerId, SmoothedAimDirection,
+    LocalAimInput, PlayerAimDirection, PlayerColor, PlayerId, PlayerVisual,
+    SmoothedAimDirection,
 };
 use crate::player::shared::player_movement;
 use crate::protocol::channels::ClientEventsChannel;
@@ -9,10 +10,12 @@ use crate::protocol::messages::{DebugServerMessage, SetUsername};
 use bevy::app::{App, FixedPreUpdate, FixedUpdate, Plugin, Update};
 use bevy::color::{Color, Hsva};
 use bevy::prelude::{
-    Add, Commands, IntoScheduleConfigs, Name, On, Query, Res, Single, With, Without, in_state,
+    Add, Commands, IntoScheduleConfigs, Name, On, Query, Res, Single, Vec2, With, Without,
+    in_state,
 };
 use leafwing_input_manager::action_state::ActionState;
 use leafwing_input_manager::input_map::InputMap;
+use lightyear::input::client::InputSystems;
 use lightyear::interpolation::Interpolated;
 use lightyear::prediction::Predicted;
 use lightyear::prelude::{
@@ -23,13 +26,16 @@ pub struct PlayerClientPlugin;
 
 impl Plugin for PlayerClientPlugin {
     fn build(&self, app: &mut App) {
+        app.init_resource::<LocalAimInput>();
         app.add_systems(
             FixedPreUpdate,
-            write_cursor_aim_to_leafwing.run_if(in_state(ClientState::Playing)),
+            write_local_aim_to_leafwing
+                .in_set(InputSystems::WriteClientInputs)
+                .run_if(in_state(ClientState::Playing)),
         );
         app.add_systems(
             FixedUpdate,
-            (player_movement, update_predicted_player_aim_direction)
+            (apply_local_aim_to_predicted_player, player_movement)
                 .chain()
                 .run_if(in_state(ClientState::Playing)),
         );
@@ -43,26 +49,36 @@ impl Plugin for PlayerClientPlugin {
     }
 }
 
-fn write_cursor_aim_to_leafwing(
-    input_entity: Single<
-        (&CachedCursorAim, &mut ActionState<PlayerAction>),
+fn write_local_aim_to_leafwing(
+    local_aim: Res<LocalAimInput>,
+    mut input_entities: Query<
+        &mut ActionState<PlayerAction>,
         (With<Controlled>, With<InputMap<PlayerAction>>),
     >,
 ) {
-    let (cached_aim, mut actions) = input_entity.into_inner();
+    let direction = local_aim.0.normalize_or_zero();
 
-    actions.set_axis_pair(&PlayerAction::Aim, cached_aim.0);
+    if direction == Vec2::ZERO {
+        return;
+    }
+
+    for mut actions in &mut input_entities {
+        actions.set_axis_pair(&PlayerAction::Aim, direction);
+    }
 }
 
-fn update_predicted_player_aim_direction(
-    mut players: Query<(&ActionState<PlayerAction>, &mut PlayerAimDirection), With<Predicted>>,
+fn apply_local_aim_to_predicted_player(
+    local_aim: Res<LocalAimInput>,
+    mut predicted_players: Query<&mut PlayerAimDirection, With<Predicted>>,
 ) {
-    for (actions, mut aim_direction) in &mut players {
-        let aim = actions.clamped_axis_pair(&PlayerAction::Aim);
+    let direction = local_aim.0.normalize_or_zero();
 
-        if aim.length_squared() > 0.0001 {
-            aim_direction.0 = aim.normalize_or_zero();
-        }
+    if direction == Vec2::ZERO {
+        return;
+    }
+
+    for mut aim_direction in &mut predicted_players {
+        aim_direction.0 = direction;
     }
 }
 
@@ -101,7 +117,7 @@ fn handle_predicted_spawn(
     if let Ok((mut color, player_id)) = predicted.get_mut(entity) {
         commands
             .entity(entity)
-            .insert(SmoothedAimDirection::default())
+            .insert((PlayerVisual, SmoothedAimDirection::default()))
             .insert(Name::new(format!("Player (Predicted): {:?}", player_id.0)));
 
         let hsva = Hsva {
@@ -136,7 +152,6 @@ fn handle_controlled_spawn(
     commands.entity(entity).insert((
         Name::new(format!("Player (Controlled): {}", player_id.0)),
         PlayerAction::default_input_map(),
-        CachedCursorAim::default(),
     ));
 }
 
@@ -148,10 +163,10 @@ fn handle_interpolated_spawn(
     let entity = trigger.entity;
 
     if let Ok((mut color, player_id)) = interpolated.get_mut(entity) {
-        commands.entity(entity).insert(Name::new(format!(
-            "Player (Interpolated): {:?}",
-            player_id.0
-        )));
+        commands.entity(entity).insert((
+            PlayerVisual,
+            Name::new(format!("Player (Interpolated): {:?}", player_id.0)),
+        ));
 
         let hsva = Hsva {
             saturation: 0.1,

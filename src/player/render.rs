@@ -1,22 +1,21 @@
 use crate::app::{ClientState, game_is_active};
 use crate::player::protocol::{
-    CachedCursorAim, PlayerAimDirection, PlayerPosition, SmoothedAimDirection,
+    LocalAimInput, PlayerAimDirection, PlayerHealth, PlayerPosition, PlayerVisual,
+    SmoothedAimDirection,
 };
 use crate::player::{PlayerColor, PlayerUsername};
-use crate::protocol::inputs::PlayerAction;
 use bevy::app::{App, Plugin, Update};
 use bevy::camera::{Camera, Camera2d};
 use bevy::color::Color;
 use bevy::math::{Isometry2d, StableInterpolate, Vec2, Vec3};
 use bevy::prelude::{
     Commands, Component, Entity, FontSize, Gizmos, GlobalTransform, IntoScheduleConfigs, Query,
-    Res, Single, Text2d, TextColor, TextFont, Time, Transform, Window, With, default, in_state,
+    Res, ResMut, Single, Text2d, TextColor, TextFont, Time, Transform, Window, With, default,
+    in_state,
 };
 use bevy::sprite::Anchor;
 use bevy::window::PrimaryWindow;
-use leafwing_input_manager::input_map::InputMap;
 use lightyear::prediction::Predicted;
-use lightyear::prelude::Controlled;
 
 /// How quickly should the camera snap to the desired location
 const CAMERA_DECAY_RATE: f32 = 5.;
@@ -54,20 +53,22 @@ struct UsernameLabel {
 
 pub(crate) fn draw_player_boxes(
     mut gizmos: Gizmos,
-    players: Query<(&PlayerPosition, &PlayerColor)>,
+    players: Query<(&PlayerPosition, &PlayerColor, &PlayerHealth), With<PlayerVisual>>,
 ) {
-    for (position, color) in &players {
+    for (position, color, health) in &players {
         gizmos.rect_2d(
             Isometry2d::from_translation(position.0),
             Vec2::ONE * 50.0,
             color.0,
         );
+
+        draw_health_bar(&mut gizmos, position, health);
     }
 }
 
 fn sync_username_labels(
     mut commands: Commands,
-    players: Query<(Entity, &PlayerPosition, &PlayerUsername)>,
+    players: Query<(Entity, &PlayerPosition, &PlayerUsername), With<PlayerVisual>>,
     mut labels: Query<(Entity, &UsernameLabel, &mut Transform, &mut Text2d)>,
 ) {
     for (player, position, username) in &players {
@@ -119,10 +120,7 @@ fn sample_cursor_aim(
     window: Single<&Window, With<PrimaryWindow>>,
     camera: Single<(&Camera, &GlobalTransform), With<Camera2d>>,
     predicted_player: Single<&PlayerPosition, With<Predicted>>,
-    mut input_entity: Single<
-        &mut CachedCursorAim,
-        (With<Controlled>, With<InputMap<PlayerAction>>),
-    >,
+    mut local_aim: ResMut<LocalAimInput>,
 ) {
     let Some(cursor_position) = window.cursor_position() else {
         return;
@@ -141,7 +139,7 @@ fn sample_cursor_aim(
         return;
     }
 
-    input_entity.0 = direction;
+    local_aim.0 = direction;
 }
 
 fn draw_local_aimstick(
@@ -186,4 +184,37 @@ fn smooth_local_aim_visual(
 
         smoothed.0 = smoothed.0.lerp(target_direction, t).normalize_or_zero();
     }
+}
+
+fn draw_health_bar(gizmos: &mut Gizmos<'_, '_>, position: &PlayerPosition, health: &PlayerHealth) {
+    const BAR_WIDTH: f32 = 50.0;
+    const BAR_HEIGHT: f32 = 5.0;
+    const BAR_OFFSET_Y: f32 = 34.0;
+
+    let health_fraction = if health.maximum == 0 {
+        0.0
+    } else {
+        (health.current as f32 / health.maximum as f32).clamp(0.0, 1.0)
+    };
+
+    let background_center = position.0 + Vec2::new(0.0, BAR_OFFSET_Y);
+    gizmos.rect_2d(
+        Isometry2d::from_translation(background_center),
+        Vec2::new(BAR_WIDTH, BAR_HEIGHT),
+        Color::srgb(0.2, 0.05, 0.05),
+    );
+
+    if health_fraction <= 0.0 {
+        return;
+    }
+
+    let foreground_size = Vec2::new(BAR_WIDTH * health_fraction, BAR_HEIGHT);
+    let foreground_center = position.0
+        + Vec2::new((foreground_size.x - BAR_WIDTH) * 0.5, BAR_OFFSET_Y);
+
+    gizmos.rect_2d(
+        Isometry2d::from_translation(foreground_center),
+        foreground_size,
+        Color::srgb(0.9, 0.2, 0.2),
+    );
 }

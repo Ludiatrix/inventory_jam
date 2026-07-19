@@ -11,6 +11,7 @@ use crate::{
 };
 
 pub const PLAYER_HALF_SIZE: f32 = 25.0;
+pub const PLAYER_COLLISION_RADIUS: f32 = PLAYER_HALF_SIZE;
 const MOVE_SPEED: f32 = 10.0;
 
 pub fn player_movement(
@@ -28,18 +29,6 @@ pub fn player_movement(
             let local_bounds = room.bounds().inflate(-PLAYER_HALF_SIZE);
 
             position.0 = position.0.clamp(local_bounds.min, local_bounds.max);
-        }
-
-        if actions.just_pressed(&PlayerAction::Fire) {
-            //info!("Fire Pressed!");
-        }
-
-        if actions.just_pressed(&PlayerAction::Interact) {
-            //info!("Interact Pressed!");
-        }
-
-        if actions.just_pressed(&PlayerAction::UseSkill) {
-            //info!("UseSkill Pressed!");
         }
     }
 }

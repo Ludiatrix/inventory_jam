@@ -1,15 +1,18 @@
 #[cfg(feature = "client")]
 mod client;
-mod protocol;
+pub mod protocol;
 #[cfg(feature = "gui")]
 mod render;
 #[cfg(feature = "server")]
 mod server;
-mod shared;
+pub mod shared;
 
 use bevy::app::{App, Plugin};
 
 pub use protocol::{PlayerAimDirection, PlayerColor, PlayerId, PlayerPosition, PlayerUsername};
+
+#[cfg(feature = "server")]
+pub use server::PlayerSpawnMode;
 
 pub struct PlayerPlugin;
 

@@ -29,6 +29,8 @@ impl Plugin for PlayerProtocolPlugin {
         app.component::<GameRoom>().replicate();
 
         app.component::<PlayerUsername>().replicate();
+
+        app.component::<PlayerHealth>().replicate().predict();
     }
 }
 
@@ -60,6 +62,7 @@ pub(crate) struct PlayerBundle {
     aim_direction: PlayerAimDirection,
     game_room: GameRoom,
     username: PlayerUsername,
+    health: PlayerHealth,
 }
 
 #[cfg(feature = "server")]
@@ -77,6 +80,7 @@ impl PlayerBundle {
                 room: GameRooms::Arena,
             },
             username: PlayerUsername(temporary_username(id.to_bits())),
+            health: PlayerHealth::new(100),
         }
     }
 }
@@ -111,10 +115,28 @@ pub struct PlayerColor(pub(crate) Color);
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq, Deref)]
 pub struct PlayerUsername(pub String);
 
-#[derive(Component, Clone, Copy, Debug)]
-pub(crate) struct CachedCursorAim(pub Vec2);
+#[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PlayerHealth {
+    pub current: u32,
+    pub maximum: u32,
+}
 
-impl Default for CachedCursorAim {
+impl PlayerHealth {
+    pub const fn new(maximum: u32) -> Self {
+        Self {
+            current: maximum,
+            maximum,
+        }
+    }
+}
+
+#[derive(Component, Clone, Copy, Debug, Default)]
+pub(crate) struct PlayerVisual;
+
+#[derive(Resource, Clone, Copy, Debug)]
+pub(crate) struct LocalAimInput(pub Vec2);
+
+impl Default for LocalAimInput {
     fn default() -> Self {
         Self(Vec2::X)
     }
