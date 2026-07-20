@@ -85,7 +85,7 @@ fn weapon_sprite_path(kind: WeaponKind) -> &'static str {
         WeaponKind::Spear => "weapon/spear/spr_icon_spear.png",
         WeaponKind::Staff => "weapon/staff/spr_icon_staff.png",
         WeaponKind::Bow => "weapon/bow/spr_icon_bow.png",
-        WeaponKind::Shuriken => "weapon/shiruken/spr_icon_shuriken.png",
+        WeaponKind::Shuriken => "weapon/shuriken/spr_icon_shuriken.png",
         WeaponKind::Boomerang => "weapon/boomerang/spr_icon_boomerang.png",
     }
 }
