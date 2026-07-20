@@ -223,7 +223,7 @@ fn handle_start_game(
                 );
             }
             #[cfg(feature = "server")]
-            LaunchMode::HostLocal | LaunchMode::DedicatedServer => {
+            LaunchMode::DedicatedServer => {
                 if !servers.is_empty() {
                     status.message = "server already running".into();
                     continue;

@@ -45,7 +45,6 @@ pub enum LaunchMode {
     Menu,
     JoinEdgegap,
     JoinLocal,
-    HostLocal,
     DedicatedServer,
 }
 

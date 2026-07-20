@@ -1,6 +1,8 @@
 //! Main menu UI: username entry and connection actions.
 
 use crate::app::{ClientState, LaunchMode, LocalUsername, MAX_USERNAME_LEN, StartGame};
+#[cfg(feature = "server")]
+use crate::app::ServerState;
 use crate::networking::ConnectionStatus;
 use crate::settings::GameSettings;
 use bevy::color::palettes::tailwind::{SLATE_300, SLATE_700, SLATE_900};
@@ -37,10 +39,13 @@ impl Plugin for MenuPlugin {
         app.add_systems(OnEnter(ClientState::Connecting), spawn_connecting_overlay);
         app.add_systems(OnExit(ClientState::Disconnected), despawn_menu_ui);
         app.add_systems(OnExit(ClientState::Connecting), despawn_menu_ui);
+        #[cfg(feature = "server")]
+        app.add_systems(OnEnter(ServerState::Hosting), despawn_menu_ui);
         app.add_systems(
             Update,
             (style_menu_buttons, handle_menu_buttons, sync_status_text)
-                .run_if(in_state(ClientState::Disconnected).or_else(in_state(ClientState::Connecting))),
+                .run_if(in_state(ClientState::Disconnected).or_else(in_state(ClientState::Connecting)))
+                .run_if(not_hosting),
         );
     }
 }
@@ -210,6 +215,16 @@ fn despawn_menu_ui(mut commands: Commands, roots: Query<Entity, With<MenuRoot>>)
     }
 }
 
+#[cfg(feature = "server")]
+fn not_hosting(server_state: Res<State<ServerState>>) -> bool {
+    *server_state.get() != ServerState::Hosting
+}
+
+#[cfg(not(feature = "server"))]
+fn not_hosting() -> bool {
+    true
+}
+
 fn menu_button(
     commands: &mut Commands,
     settings: &GameSettings,
@@ -307,7 +322,7 @@ fn handle_menu_buttons(
             #[cfg(all(feature = "dev", feature = "server", not(target_family = "wasm")))]
             MenuButton::HostLocal => {
                 starts.write(StartGame {
-                    mode: LaunchMode::HostLocal,
+                    mode: LaunchMode::DedicatedServer,
                     username: String::new(),
                 });
             }

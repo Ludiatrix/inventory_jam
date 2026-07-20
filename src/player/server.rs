@@ -1,4 +1,4 @@
-use crate::app::{LaunchConfig, LaunchMode, ServerState};
+use crate::app::ServerState;
 use crate::enemy::{EnemyHealth, EnemyPosition};
 use crate::player::protocol::{
     PlayerAimDirection, PlayerBundle, PlayerHealth, PlayerPosition, PlayerVisual,
@@ -233,17 +233,12 @@ pub(crate) fn debug_switch_rooms(
 }
 
 fn control_dedicated_server_camera(
-    config: Res<LaunchConfig>,
     keyboard: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     window: Single<&Window, With<PrimaryWindow>>,
     mut camera: Single<(&mut Transform, &mut Projection), With<Camera2d>>,
     settings: Res<GameSettings>,
 ) {
-    if config.mode != LaunchMode::DedicatedServer {
-        return;
-    }
-
     let (mut camera_transform, mut projection) = camera.into_inner();
     let Projection::Orthographic(ref mut orthographic) = *projection else {
         return;

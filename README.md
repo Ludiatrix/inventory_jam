@@ -22,9 +22,8 @@ GUI builds open a **main menu** by default. Enter a username, then:
 
 Skip the menu with CLI flags:
 
-- Dedicated server: `cargo run -- --mode server`
+- Server (also used to host locally in a GUI build): `cargo run -- --mode server`
 - Join Edgegap: `cargo run -- --mode edgegap --user Ada`
-- Host local: `cargo run -- --mode host`
 - Join local: `cargo run -- --mode local --user Ada`
 
 Netcode client ids are derived from `--user` / the menu username, so each player needs a distinct name.
