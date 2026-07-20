@@ -1,6 +1,7 @@
 use crate::app::ServerState;
 use crate::enemy::api::SpawnEnemy;
 use crate::enemy::protocol::{EnemyHealth, EnemyPosition};
+use crate::protocol::rooms::{GameRoom, GameRooms};
 use bevy::prelude::*;
 use lightyear::prelude::*;
 use rand::Rng;
@@ -72,6 +73,7 @@ fn spawn_enemy(commands: &mut Commands, spawn_position: Vec2) -> Entity {
         .spawn((
             EnemyPosition(spawn_position),
             EnemyHealth::new(ENEMY_MAX_HEALTH),
+            GameRoom { room: GameRooms::Arena },
             Replicate::to_clients(NetworkTarget::All),
             InterpolationTarget::to_clients(NetworkTarget::All),
             Name::new("Enemy"),
