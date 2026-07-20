@@ -2,8 +2,6 @@ use bevy::prelude::*;
 use lightyear::{core::tick::TickDuration, prelude::*};
 use serde::{Deserialize, Serialize};
 
-/// Installs weapon component registration on every peer before connections are
-/// spawned.
 pub struct WeaponProtocolPlugin;
 
 impl Plugin for WeaponProtocolPlugin {
@@ -14,20 +12,16 @@ impl Plugin for WeaponProtocolPlugin {
 }
 
 /// Stable gameplay identifier replicated over the network.
-///
-/// Clients map this ID to local art and audio. Asset paths are deliberately not
-/// replicated because they are presentation data, not authoritative state.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum WeaponKind {
     Sword,
     Spear,
     Staff,
+    Bow,
+    Shuriken,
+    Boomerang,
 }
 
-/// The weapon currently equipped by a player.
-///
-/// The server owns this component and replicates it to every client. Weapon
-/// stats are resolved from `WeaponKind` and `level` on the server.
 #[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EquippedWeapon {
     pub kind: WeaponKind,
@@ -40,7 +34,6 @@ impl EquippedWeapon {
     }
 }
 
-/// Server-only firing state attached to an authoritative player entity.
 #[derive(
     Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Deref, DerefMut, Default,
 )]

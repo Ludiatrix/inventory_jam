@@ -6,7 +6,9 @@ use lightyear::{
     prelude::{InterpolationTarget, PreSpawned, PredictionTarget, Replicate},
 };
 
-use crate::{enemy::{EnemyHealth, EnemyPosition, shared::ENEMY_COLLISION_RADIUS}, player::{PlayerId, PlayerPosition}, projectile::protocol::{PlayerProjectile, ProjectileImpact, ProjectilePosition}, protocol::rooms::GameRoom};
+use crate::{
+    enemy::{EnemyHealth, EnemyPosition, shared::ENEMY_COLLISION_RADIUS}, fragment::api::SpawnFragmentPool, player::{PlayerId, PlayerPosition}, projectile::protocol::{PlayerProjectile, ProjectileImpact, ProjectilePosition}, protocol::rooms::GameRoom,
+};
 use crate::player::shared::{PLAYER_COLLISION_RADIUS, PLAYER_HALF_SIZE};
 use crate::player::protocol::PlayerHealth;
 
@@ -89,8 +91,9 @@ pub fn simulate_server_projectiles(
         &GameRoom,
         &mut PlayerHealth,
     )>,
-    mut enemies: Query<(Entity, &EnemyPosition, &mut EnemyHealth)>,
+    mut enemies: Query<(Entity, &EnemyPosition, &GameRoom, &mut EnemyHealth)>,
     local_timeline: Res<LocalTimeline>,
+    mut fragment_drops: MessageWriter<SpawnFragmentPool>,
 ) {
     for (projectile_entity, projectile, mut position, room) in &mut projectiles {
         move_projectile(&mut position, projectile);
@@ -101,14 +104,13 @@ pub fn simulate_server_projectiles(
         }
 
         if let Some((enemy_entity, enemy_died)) =
-            get_hit_enemy(&mut enemies, projectile, &position)
+            get_hit_enemy(&mut enemies, projectile, &position, room)
         {
             spawn_projectile_impact(&mut commands, projectile_entity, projectile, &position);
-
             if enemy_died {
+                fragment_drops.write(SpawnFragmentPool::new(position.0, 12, *room));
                 commands.entity(enemy_entity).despawn();
             }
-
             continue;
         }
 
@@ -236,12 +238,13 @@ fn get_hit_player(
 }
 
 fn get_hit_enemy(
-    enemies: &mut Query<'_, '_, (Entity, &EnemyPosition, &mut EnemyHealth)>,
+    enemies: &mut Query<'_, '_, (Entity, &EnemyPosition, &GameRoom, &mut EnemyHealth)>,
     projectile: &PlayerProjectile,
     position: &ProjectilePosition,
+    projectile_room: &GameRoom,
 ) -> Option<(Entity, bool)> {
-    for (enemy_entity, enemy_position, mut health) in enemies {
-        if health.current == 0 {
+    for (enemy_entity, enemy_position, enemy_room, mut health) in enemies {
+        if enemy_room != projectile_room || health.current == 0 {
             continue;
         }
 

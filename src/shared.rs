@@ -1,12 +1,17 @@
 use crate::{app::ServerState, protocol::ProtocolPlugin};
 use bevy::prelude::*;
 
+/// World-space size of one 16x16 source-art tile.
+pub const TILE_PIXEL_SIZE: f32 = 50.0;
+pub const ARENA_AREA_IN_TILES: Vec2 = Vec2::new(32.0, 24.0);
+pub const SAFEZONE_AREA_IN_TILES: Vec2 = Vec2::new(32.0, 24.0);
+
 pub static ARENA_WORLD_BOUNDS: Rect =
     Rect::from_center_size(Vec2::new(0.0, 0.0), Vec2::new(1600.0, 1200.0));
-pub static SHOP_WORLD_BOUNDS: Rect =
+pub static SAFEZONE_WORLD_BOUNDS: Rect =
     Rect::from_center_size(Vec2::new(1700.0, 0.0), Vec2::new(1600.0, 1200.0));
 
-pub const GAME_NAME: &str = "Arena of Chapions";
+pub const GAME_NAME: &str = "Arena of Champions";
 
 #[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FixedGameplaySet {

@@ -98,6 +98,7 @@ fn base_app() -> App {
                     meta_check: bevy::asset::AssetMetaCheck::Never,
                     ..default()
                 })
+                .set(bevy::image::ImagePlugin::default_nearest())
                 .set(log_plugin())
                 .set(WindowPlugin {
                     primary_window: Some(Window {

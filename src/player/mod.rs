@@ -11,9 +11,6 @@ use bevy::app::{App, Plugin};
 
 pub use protocol::{PlayerAimDirection, PlayerColor, PlayerId, PlayerPosition, PlayerUsername};
 
-#[cfg(feature = "server")]
-pub use server::PlayerSpawnMode;
-
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {

@@ -1,6 +1,5 @@
 use bevy::{
     ecs::system::{Commands, Query, Res},
-    log::info,
     math::Vec2,
     state::state::State,
 };
@@ -11,17 +10,12 @@ use crate::{
     app::ServerState,
     player::{PlayerAimDirection, PlayerId, PlayerPosition},
     projectile::{
-        PlayerProjectile, ProjectileLifetime, SpawnProjectile, projectile_spawn_position,
+        projectile_spawn_position, PlayerProjectile, ProjectileLifetime, SpawnProjectile,
     },
     protocol::{inputs::PlayerAction, rooms::GameRoom},
     weapon::protocol::{EquippedWeapon, WeaponCooldown, WeaponKind},
 };
 
-/// Authoritative combat values resolved from an equipped weapon.
-///
-/// Keep these values in shared code so server simulation and client-side
-/// presentation can agree on geometry. Only the server may use them to decide
-/// whether damage is applied.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WeaponStats {
     pub damage: u32,
@@ -31,10 +25,6 @@ pub struct WeaponStats {
     pub projectile_radius: f32,
 }
 
-/// Returns the final stats for a weapon and level.
-///
-/// Level scaling is intentionally centralized here. Do not store duplicated
-/// damage/range/attack-speed fields on each player.
 pub fn weapon_stats(kind: WeaponKind, level: u32) -> WeaponStats {
     let level = level.max(1);
     let bonus_levels = level.saturating_sub(1);
@@ -61,14 +51,30 @@ pub fn weapon_stats(kind: WeaponKind, level: u32) -> WeaponStats {
             projectile_speed_per_tick: 16.0,
             projectile_radius: 14.0,
         },
+        WeaponKind::Bow => WeaponStats {
+            damage: 28 + bonus_levels * 5,
+            range: 650.0 + bonus_levels as f32 * 18.0,
+            attacks_per_second: 1.8 + bonus_levels as f32 * 0.06,
+            projectile_speed_per_tick: 24.0,
+            projectile_radius: 6.0,
+        },
+        WeaponKind::Shuriken => WeaponStats {
+            damage: 12 + bonus_levels * 2,
+            range: 420.0 + bonus_levels as f32 * 12.0,
+            attacks_per_second: 4.0 + bonus_levels as f32 * 0.12,
+            projectile_speed_per_tick: 19.0,
+            projectile_radius: 8.0,
+        },
+        WeaponKind::Boomerang => WeaponStats {
+            damage: 24 + bonus_levels * 4,
+            range: 500.0 + bonus_levels as f32 * 15.0,
+            attacks_per_second: 1.6 + bonus_levels as f32 * 0.05,
+            projectile_speed_per_tick: 15.0,
+            projectile_radius: 14.0,
+        },
     }
 }
 
-/// Converts player fire input into authoritative replicated projectiles.
-///
-/// Damage, range, speed, and radius are snapshotted into the projectile when it
-/// is fired. Changing weapons afterward cannot retroactively alter an existing
-/// projectile.
 pub(crate) fn fire_equipped_weapons(
     mut commands: Commands,
     mut players: Query<(
@@ -87,8 +93,6 @@ pub(crate) fn fire_equipped_weapons(
     for (player_id, player_position, aim_direction, room, actions, equipped_weapon, mut cooldown) in
         &mut players
     {
-        // `pressed` allows attack speed to control automatic repeat while the
-        // button is held. Use `just_pressed` here instead for semi-auto weapons.
         if !actions.pressed(&PlayerAction::Fire) || !cooldown.is_ready(local_timeline.tick()) {
             continue;
         }
@@ -101,28 +105,24 @@ pub(crate) fn fire_equipped_weapons(
         let stats = weapon_stats(equipped_weapon.kind, equipped_weapon.level);
         let spawn_position =
             projectile_spawn_position(player_position.0, direction, stats.projectile_radius);
-
         let expire_time = ProjectileLifetime::new(
             &local_timeline.tick(),
             stats.range,
             stats.projectile_speed_per_tick,
         );
 
-        let projectile = PlayerProjectile {
-            owner: player_id.0,
-            weapon: equipped_weapon.kind,
-            origin: spawn_position,
-            direction,
-            speed_per_tick: stats.projectile_speed_per_tick,
-            damage: stats.damage,
-            max_range: stats.range,
-            radius: stats.projectile_radius,
-            expire_time,
-        };
-
-        info!("fire_equipped_weapons");
         commands.queue(SpawnProjectile {
-            projectile,
+            projectile: PlayerProjectile {
+                owner: player_id.0,
+                weapon: equipped_weapon.kind,
+                origin: spawn_position,
+                direction,
+                speed_per_tick: stats.projectile_speed_per_tick,
+                damage: stats.damage,
+                max_range: stats.range,
+                radius: stats.projectile_radius,
+                expire_time,
+            },
             spawn_position,
             room: *room,
             is_authoritative: matches!(app_state.get(), ServerState::Hosting),

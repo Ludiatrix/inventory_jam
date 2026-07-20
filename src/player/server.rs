@@ -215,8 +215,8 @@ pub(crate) fn debug_switch_rooms(
     for (actions, mut room) in &mut player_query {
         if actions.just_pressed(&PlayerAction::DebugSwitchRooms) {
             room.room = match room.room {
-                GameRooms::Arena => GameRooms::Pit,
-                GameRooms::Pit => GameRooms::Arena,
+                GameRooms::Arena => GameRooms::Safezone,
+                GameRooms::Safezone => GameRooms::Arena,
             }
         }
     }
