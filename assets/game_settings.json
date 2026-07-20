@@ -4,7 +4,7 @@
     "spawn_radius": 150.0,
     "max_health": 100,
     "collision_radius": 25.0,
-    "limit": 10000,
+    "limit": 5000,
     "max_spawns_per_tick": 50,
     "spawn_candidate_count": 32
   },
