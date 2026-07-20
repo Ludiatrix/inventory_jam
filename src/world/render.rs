@@ -1,14 +1,7 @@
-use crate::shared::{ARENA_WORLD_BOUNDS, SAFEZONE_WORLD_BOUNDS, TILE_PIXEL_SIZE};
+use crate::settings::GameSettings;
 use bevy::camera::Camera2d;
 use bevy::prelude::*;
 use std::collections::{HashMap, HashSet};
-
-/// Number of tiles retained around the camera. This is intentionally larger
-/// than a typical viewport so camera movement never exposes an unloaded edge.
-const STREAM_HALF_WIDTH: i32 = 28;
-const STREAM_HALF_HEIGHT: i32 = 20;
-
-const ARENA_FLOOR_TILES: &[usize] = &[35, 36, 37, 43, 44, 45, 51, 52, 53];
 
 pub struct WorldRenderPlugin;
 
@@ -81,6 +74,7 @@ fn stream_world_tiles(
     assets: Option<Res<WorldTileAssets>>,
     cameras: Query<&GlobalTransform, With<Camera2d>>,
     mut loaded: ResMut<LoadedWorldTiles>,
+    settings: Res<GameSettings>,
 ) {
     let Some(assets) = assets else {
         return;
@@ -92,8 +86,8 @@ fn stream_world_tiles(
 
     let camera_position = camera_transform.translation().truncate();
     let camera_tile = IVec2::new(
-        (camera_position.x / TILE_PIXEL_SIZE).floor() as i32,
-        (camera_position.y / TILE_PIXEL_SIZE).floor() as i32,
+        (camera_position.x / settings.world.tile_pixel_size).floor() as i32,
+        (camera_position.y / settings.world.tile_pixel_size).floor() as i32,
     );
 
     if loaded.last_camera_tile == Some(camera_tile) {
@@ -103,14 +97,14 @@ fn stream_world_tiles(
 
     let mut desired = HashSet::new();
 
-    for y in (camera_tile.y - STREAM_HALF_HEIGHT)..=(camera_tile.y + STREAM_HALF_HEIGHT) {
-        for x in (camera_tile.x - STREAM_HALF_WIDTH)..=(camera_tile.x + STREAM_HALF_WIDTH) {
+    for y in (camera_tile.y - settings.world.stream_half_height)..=(camera_tile.y + settings.world.stream_half_height) {
+        for x in (camera_tile.x - settings.world.stream_half_width)..=(camera_tile.x + settings.world.stream_half_width) {
             let world_position = Vec2::new(
-                (x as f32 + 0.5) * TILE_PIXEL_SIZE,
-                (y as f32 + 0.5) * TILE_PIXEL_SIZE,
+                (x as f32 + 0.5) * settings.world.tile_pixel_size,
+                (y as f32 + 0.5) * settings.world.tile_pixel_size,
             );
 
-            let Some(room) = room_for_position(world_position) else {
+            let Some(room) = room_for_position(world_position, &settings) else {
                 continue;
             };
 
@@ -121,7 +115,7 @@ fn stream_world_tiles(
                 continue;
             }
 
-            let entity = spawn_world_tile(&mut commands, &assets, key, world_position);
+            let entity = spawn_world_tile(&mut commands, &assets, key, world_position, &settings);
             loaded.entities.insert(key, entity);
         }
     }
@@ -143,12 +137,13 @@ fn spawn_world_tile(
     assets: &WorldTileAssets,
     key: TileKey,
     world_position: Vec2,
+    settings: &GameSettings,
 ) -> Entity {
-    let scale = TILE_PIXEL_SIZE / 16.0;
+    let scale = settings.world.tile_pixel_size / 16.0;
 
     match key.room {
         TileRoom::Arena => {
-            let index = arena_floor_index(key.x, key.y);
+            let index = arena_floor_index(key.x, key.y, &settings.world.arena_floor_tiles);
             commands
                 .spawn((
                     WorldTile,
@@ -169,6 +164,11 @@ fn spawn_world_tile(
                 .id()
         }
         TileRoom::Safezone => {
+            // The safezone sheet primarily contains props and multi-cell
+            // structures, not a set of opaque floor variants. Randomly treating
+            // those pieces as floor tiles caused the sliced staircase pattern.
+            // Use a stable opaque floor tile and reserve the atlas for authored
+            // props/walls rather than scattering transparent fragments.
             commands
                 .spawn((
                     WorldTile,
@@ -185,7 +185,7 @@ fn spawn_world_tile(
     }
 }
 
-fn arena_floor_index(x: i32, y: i32) -> usize {
+fn arena_floor_index(x: i32, y: i32, arena_floor_tiles: &[usize]) -> usize {
     // Deterministic integer hash: visually varied, stable between frames and
     // clients, and avoids obvious row/column striping.
     let mut value = (x as u32).wrapping_mul(0x9E37_79B9)
@@ -194,21 +194,21 @@ fn arena_floor_index(x: i32, y: i32) -> usize {
     value = value.wrapping_mul(0x7FEB_352D);
     value ^= value >> 15;
 
-    ARENA_FLOOR_TILES[value as usize % ARENA_FLOOR_TILES.len()]
+    arena_floor_tiles[value as usize % arena_floor_tiles.len()]
 }
 
-fn room_for_position(position: Vec2) -> Option<TileRoom> {
-    if ARENA_WORLD_BOUNDS.contains(position) {
+fn room_for_position(position: Vec2, settings: &GameSettings) -> Option<TileRoom> {
+    if settings.world.arena_bounds().contains(position) {
         Some(TileRoom::Arena)
-    } else if SAFEZONE_WORLD_BOUNDS.contains(position) {
+    } else if settings.world.safezone_bounds().contains(position) {
         Some(TileRoom::Safezone)
     } else {
         None
     }
 }
 
-fn draw_world_boundaries(mut gizmos: Gizmos) {
-    for bounds in [ARENA_WORLD_BOUNDS, SAFEZONE_WORLD_BOUNDS] {
+fn draw_world_boundaries(settings: Res<GameSettings>, mut gizmos: Gizmos) {
+    for bounds in [settings.world.arena_bounds(), settings.world.safezone_bounds()] {
         gizmos.rect_2d(
             Isometry2d::from_translation(bounds.center()),
             bounds.size(),

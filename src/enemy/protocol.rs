@@ -3,7 +3,6 @@ use bevy::prelude::*;
 use lightyear::prelude::*;
 use serde::{Deserialize, Serialize};
 
-pub const ENEMY_SIZE: f32 = 50.0;
 
 pub struct EnemyProtocolPlugin;
 

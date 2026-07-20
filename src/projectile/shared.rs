@@ -7,9 +7,8 @@ use lightyear::{
 };
 
 use crate::{
-    enemy::{EnemyHealth, EnemyPosition, shared::ENEMY_COLLISION_RADIUS}, fragment::api::SpawnFragmentPool, player::{PlayerId, PlayerPosition}, projectile::protocol::{PlayerProjectile, ProjectileImpact, ProjectilePosition}, protocol::rooms::GameRoom,
+    enemy::{EnemyHealth, EnemyPosition}, fragment::api::SpawnFragmentPool, player::{PlayerId, PlayerPosition}, projectile::protocol::{PlayerProjectile, ProjectileImpact, ProjectilePosition}, protocol::rooms::GameRoom, settings::GameSettings,
 };
-use crate::player::shared::{PLAYER_COLLISION_RADIUS, PLAYER_HALF_SIZE};
 use crate::player::protocol::PlayerHealth;
 
 pub struct SpawnProjectile {
@@ -50,18 +49,19 @@ pub struct ImpactLifetime {
     pub remaining_ticks: u16,
 }
 
-pub const IMPACT_LIFETIME_TICKS: u16 = 12;
 
 pub fn projectile_spawn_position(
     player_position: Vec2,
     direction: Vec2,
     projectile_radius: f32,
+    settings: &GameSettings,
 ) -> Vec2 {
-    const SPAWN_GAP: f32 = 2.0;
 
     player_position
         + direction.normalize_or_zero()
-            * (PLAYER_HALF_SIZE + projectile_radius.max(0.0) + SPAWN_GAP)
+            * (settings.player.half_size
+                + projectile_radius.max(0.0)
+                + settings.projectile.spawn_gap)
 }
 
 pub fn move_projectile(position: &mut ProjectilePosition, projectile: &PlayerProjectile) {
@@ -94,19 +94,32 @@ pub fn simulate_server_projectiles(
     mut enemies: Query<(Entity, &EnemyPosition, &GameRoom, &mut EnemyHealth)>,
     local_timeline: Res<LocalTimeline>,
     mut fragment_drops: MessageWriter<SpawnFragmentPool>,
+    settings: Res<GameSettings>,
 ) {
     for (projectile_entity, projectile, mut position, room) in &mut projectiles {
         move_projectile(&mut position, projectile);
 
-        if get_hit_player(&mut players, projectile, &position, room).is_some() {
-            spawn_projectile_impact(&mut commands, projectile_entity, projectile, &position);
+        if get_hit_player(&mut players, projectile, &position, room, &settings).is_some() {
+            spawn_projectile_impact(
+                &mut commands,
+                projectile_entity,
+                projectile,
+                &position,
+                &settings,
+            );
             continue;
         }
 
         if let Some((enemy_entity, enemy_died)) =
-            get_hit_enemy(&mut enemies, projectile, &position, room)
+            get_hit_enemy(&mut enemies, projectile, &position, room, &settings)
         {
-            spawn_projectile_impact(&mut commands, projectile_entity, projectile, &position);
+            spawn_projectile_impact(
+                &mut commands,
+                projectile_entity,
+                projectile,
+                &position,
+                &settings,
+            );
             if enemy_died {
                 fragment_drops.write(SpawnFragmentPool::new(position.0, 12, *room));
                 commands.entity(enemy_entity).despawn();
@@ -121,6 +134,7 @@ pub fn simulate_server_projectiles(
             projectile,
             &position,
             room,
+            &settings,
         );
     }
 }
@@ -138,6 +152,7 @@ pub fn simulate_predicted_projectiles(
         With<Predicted>,
     >,
     local_timeline: Res<LocalTimeline>,
+    settings: Res<GameSettings>,
 ) {
     for (entity, projectile, mut position, room) in &mut projectiles {
         move_projectile(&mut position, projectile);
@@ -148,6 +163,7 @@ pub fn simulate_predicted_projectiles(
             projectile,
             &position,
             room,
+            &settings,
         );
     }
 }
@@ -159,10 +175,11 @@ fn check_projectile_range(
     projectile: &PlayerProjectile,
     position: &ProjectilePosition,
     room: &GameRoom,
+    settings: &GameSettings,
 ) {
     if projectile.expire_time.is_expired(&local_timeline.tick())
         || projectile_reached_max_range(position, projectile)
-        || projectile_is_outside_world(position.0, room)
+        || projectile_is_outside_world(position.0, room, settings)
     {
         commands.entity(projectile_entity).prediction_despawn();
     }
@@ -173,6 +190,7 @@ fn spawn_projectile_impact(
     projectile_entity: Entity,
     projectile: &PlayerProjectile,
     position: &ProjectilePosition,
+    settings: &GameSettings,
 ) {
     commands.spawn((
         ProjectileImpact {
@@ -181,7 +199,7 @@ fn spawn_projectile_impact(
             damage: projectile.damage,
         },
         ImpactLifetime {
-            remaining_ticks: IMPACT_LIFETIME_TICKS,
+            remaining_ticks: settings.projectile.impact_lifetime_ticks,
         },
         Replicate::to_clients(NetworkTarget::All),
         Name::new("Server Projectile Impact"),
@@ -205,6 +223,7 @@ fn get_hit_player(
     projectile: &PlayerProjectile,
     position: &ProjectilePosition,
     projectile_room: &GameRoom,
+    settings: &GameSettings,
 ) -> Option<Entity> {
     for (player_entity, player_id, player_position, player_room, mut health) in players {
         if player_id.0 == projectile.owner
@@ -214,7 +233,7 @@ fn get_hit_player(
             continue;
         }
 
-        let collision_radius = projectile.radius + PLAYER_COLLISION_RADIUS;
+        let collision_radius = projectile.radius + settings.player.collision_radius;
         let hit = position.0.distance_squared(player_position.0)
             <= collision_radius * collision_radius;
 
@@ -242,13 +261,14 @@ fn get_hit_enemy(
     projectile: &PlayerProjectile,
     position: &ProjectilePosition,
     projectile_room: &GameRoom,
+    settings: &GameSettings,
 ) -> Option<(Entity, bool)> {
     for (enemy_entity, enemy_position, enemy_room, mut health) in enemies {
         if enemy_room != projectile_room || health.current == 0 {
             continue;
         }
 
-        let collision_radius = projectile.radius + ENEMY_COLLISION_RADIUS;
+        let collision_radius = projectile.radius + settings.enemy.collision_radius;
         let hit = position.0.distance_squared(enemy_position.0)
             <= collision_radius * collision_radius;
 
@@ -276,6 +296,10 @@ pub fn expire_server_impacts(
     }
 }
 
-fn projectile_is_outside_world(position: Vec2, room: &GameRoom) -> bool {
-    !room.bounds().contains(position)
+fn projectile_is_outside_world(
+    position: Vec2,
+    room: &GameRoom,
+    settings: &GameSettings,
+) -> bool {
+    !room.bounds(&settings.world).contains(position)
 }

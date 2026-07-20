@@ -10,6 +10,7 @@ use crate::player::{PlayerId, PlayerPosition, PlayerUsername};
 use crate::protocol::inputs::PlayerAction;
 use crate::protocol::rooms::GameRoom;
 use crate::shared::FixedGameplaySet;
+use crate::settings::GameSettings;
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 use lightyear::prelude::*;
@@ -18,10 +19,6 @@ use rand::Rng;
 const MIN_FRAGMENTS_PER_DEBUG_POOL: u16 = 50;
 const MAX_FRAGMENTS_PER_DEBUG_POOL: u16 = 150;
 
-// The minimum is deliberately larger than the normal collection radius so a
-// debug pool does not disappear on the same tick that it spawns.
-const FRAGMENT_POOL_MIN_RADIUS: f32 = 50.0;
-const FRAGMENT_POOL_MAX_RADIUS: f32 = 200.0;
 
 /// Installs only server-authoritative fragment behavior.
 pub struct FragmentServerPlugin;
@@ -80,6 +77,7 @@ pub(crate) fn request_debug_fragment_pool(
 /// fragment entities.
 pub(crate) fn spawn_requested_fragment_pools(
     mut commands: Commands,
+    settings: Res<GameSettings>,
     mut requests: MessageReader<SpawnFragmentPool>,
 ) {
     let mut rng = rand::rng();
@@ -91,6 +89,7 @@ pub(crate) fn spawn_requested_fragment_pools(
             request.center,
             request.count,
             request.room,
+            &settings,
         );
     }
 }
@@ -101,6 +100,7 @@ fn spawn_fragment_pool(
     center: Vec2,
     count: u16,
     room: GameRoom,
+    settings: &GameSettings,
 ) {
     info!(?center, count, "SERVER spawning Fragment pool");
 
@@ -108,15 +108,15 @@ fn spawn_fragment_pool(
         let spawn_position = random_position_in_annulus(
             rng,
             center,
-            FRAGMENT_POOL_MIN_RADIUS,
-            FRAGMENT_POOL_MAX_RADIUS,
+            settings.fragment.pool_min_radius,
+            settings.fragment.pool_max_radius,
         );
 
         commands.spawn((
             Fragment::available(spawn_position),
             FragmentPosition(spawn_position),
             FragmentLifetime {
-                remaining_ticks: fragment_shared::FRAGMENT_LIFETIME_TICKS,
+                remaining_ticks: settings.fragment.lifetime_ticks,
             },
             room,
             ServerFragment,
@@ -142,6 +142,7 @@ pub(crate) fn simulate_server_fragments(
     ready_players: Query<&PlayerUsername, With<PersistenceReady>>,
     mut transactions: MessageWriter<Transaction>,
     host_server: Query<(), With<lightyear::connection::host::HostServer>>,
+    settings: Res<GameSettings>,
 ) {
     let is_host_server = !host_server.is_empty();
 
@@ -154,12 +155,13 @@ pub(crate) fn simulate_server_fragments(
                 &mut position,
                 &players,
                 is_host_server,
+                &settings,
             );
             continue;
         }
 
         if let Some((player_entity, collector)) =
-            nearest_player_in_collection_range(position.0, &players, is_host_server)
+            nearest_player_in_collection_range(position.0, &players, is_host_server, &settings)
         {
             let Ok(username) = ready_players.get(player_entity) else {
                 // Player is not persistence-ready yet; leave the fragment available.
@@ -181,7 +183,7 @@ pub(crate) fn simulate_server_fragments(
 
         lifetime.remaining_ticks = lifetime.remaining_ticks.saturating_sub(1);
 
-        if lifetime.remaining_ticks == 0 || fragment_is_outside_world(position.0, room) {
+        if lifetime.remaining_ticks == 0 || fragment_is_outside_world(position.0, room, &settings) {
             commands.entity(fragment_entity).despawn();
         }
     }
@@ -194,11 +196,12 @@ fn simulate_collected_fragment(
     position: &mut FragmentPosition,
     players: &Query<(Entity, &PlayerId, &PlayerPosition, Has<Predicted>)>,
     is_host_server: bool,
+    settings: &GameSettings,
 ) {
     if let Some(target) = player_position_by_id(collector, players, is_host_server) {
-        fragment_shared::pull_fragment_toward(position, target);
+        fragment_shared::pull_fragment_toward(position, target, &settings.fragment);
         if position.0.distance_squared(target)
-            <= fragment_shared::FRAGMENT_RADIUS * fragment_shared::FRAGMENT_RADIUS
+            <= settings.fragment.radius * settings.fragment.radius
         {
             commands.entity(fragment_entity).despawn();
         }
@@ -209,9 +212,10 @@ fn nearest_player_in_collection_range(
     fragment_position: Vec2,
     players: &Query<(Entity, &PlayerId, &PlayerPosition, Has<Predicted>)>,
     is_host_server: bool,
+    settings: &GameSettings,
 ) -> Option<(Entity, PeerId)> {
     let collection_radius_squared =
-        fragment_shared::PLAYER_COLLECTION_RADIUS * fragment_shared::PLAYER_COLLECTION_RADIUS;
+        settings.fragment.player_collection_radius * settings.fragment.player_collection_radius;
 
     players
         .iter()
@@ -260,6 +264,10 @@ fn random_position_in_annulus(
     center + direction * radius
 }
 
-fn fragment_is_outside_world(position: Vec2, room: &GameRoom) -> bool {
-    !room.bounds().contains(position)
+fn fragment_is_outside_world(
+    position: Vec2,
+    room: &GameRoom,
+    settings: &GameSettings,
+) -> bool {
+    !room.bounds(&settings.world).contains(position)
 }

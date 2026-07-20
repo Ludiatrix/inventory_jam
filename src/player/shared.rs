@@ -1,6 +1,7 @@
 use bevy::{
     ecs::{query::With, system::Query},
     math::Vec2,
+    prelude::Res,
 };
 use leafwing_input_manager::action_state::ActionState;
 use lightyear::prediction::Predicted;
@@ -8,13 +9,11 @@ use lightyear::prediction::Predicted;
 use crate::{
     player::PlayerPosition,
     protocol::{inputs::PlayerAction, rooms::GameRoom},
+    settings::GameSettings,
 };
 
-pub const PLAYER_HALF_SIZE: f32 = 25.0;
-pub const PLAYER_COLLISION_RADIUS: f32 = PLAYER_HALF_SIZE;
-const MOVE_SPEED: f32 = 10.0;
-
 pub fn player_movement(
+    settings: Res<GameSettings>,
     mut player_query: Query<
         (&mut PlayerPosition, &GameRoom, &ActionState<PlayerAction>),
         With<Predicted>,
@@ -24,9 +23,11 @@ pub fn player_movement(
         let movement = actions.clamped_axis_pair(&PlayerAction::Move);
 
         if movement != Vec2::ZERO {
-            position.0 += movement * MOVE_SPEED;
+            position.0 += movement * settings.player.move_speed;
 
-            let local_bounds = room.bounds().inflate(-PLAYER_HALF_SIZE);
+            let local_bounds = room
+                .bounds(&settings.world)
+                .inflate(-settings.player.half_size);
 
             position.0 = position.0.clamp(local_bounds.min, local_bounds.max);
         }

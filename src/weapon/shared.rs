@@ -14,6 +14,7 @@ use crate::{
     },
     protocol::{inputs::PlayerAction, rooms::GameRoom},
     weapon::protocol::{EquippedWeapon, WeaponCooldown, WeaponKind},
+    settings::GameSettings,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -89,6 +90,7 @@ pub(crate) fn fire_equipped_weapons(
     app_state: Res<State<ServerState>>,
     local_timeline: Res<LocalTimeline>,
     tick_duration: Res<TickDuration>,
+    settings: Res<GameSettings>,
 ) {
     for (player_id, player_position, aim_direction, room, actions, equipped_weapon, mut cooldown) in
         &mut players
@@ -104,7 +106,12 @@ pub(crate) fn fire_equipped_weapons(
 
         let stats = weapon_stats(equipped_weapon.kind, equipped_weapon.level);
         let spawn_position =
-            projectile_spawn_position(player_position.0, direction, stats.projectile_radius);
+            projectile_spawn_position(
+                player_position.0,
+                direction,
+                stats.projectile_radius,
+                &settings,
+            );
         let expire_time = ProjectileLifetime::new(
             &local_timeline.tick(),
             stats.range,

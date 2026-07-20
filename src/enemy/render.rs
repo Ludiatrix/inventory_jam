@@ -1,5 +1,6 @@
 use crate::app::game_is_active;
-use crate::enemy::protocol::{ENEMY_SIZE, EnemyHealth, EnemyPosition};
+use crate::enemy::protocol::{EnemyHealth, EnemyPosition};
+use crate::settings::GameSettings;
 use bevy::prelude::*;
 
 pub struct EnemyRenderPlugin;
@@ -64,7 +65,11 @@ fn sync_enemy_sprites(mut enemies: Query<(&EnemyPosition, &mut Transform)>) {
     }
 }
 
-fn draw_health_bars(mut gizmos: Gizmos, enemies: Query<(&EnemyPosition, &EnemyHealth)>) {
+fn draw_health_bars(
+    settings: Res<GameSettings>,
+    mut gizmos: Gizmos,
+    enemies: Query<(&EnemyPosition, &EnemyHealth)>,
+) {
     for (position, health) in &enemies {
         let health_fraction = if health.maximum == 0 {
             0.0
@@ -72,8 +77,8 @@ fn draw_health_bars(mut gizmos: Gizmos, enemies: Query<(&EnemyPosition, &EnemyHe
             health.current as f32 / health.maximum as f32
         };
 
-        let bar_size = Vec2::new(ENEMY_SIZE * health_fraction, 5.0);
-        let bar_center = position.0 + Vec2::new((bar_size.x - ENEMY_SIZE) * 0.5, 34.0);
+        let bar_size = Vec2::new(settings.enemy.size * health_fraction, 5.0);
+        let bar_center = position.0 + Vec2::new((bar_size.x - settings.enemy.size) * 0.5, 34.0);
         gizmos.rect_2d(
             Isometry2d::from_translation(bar_center),
             bar_size,

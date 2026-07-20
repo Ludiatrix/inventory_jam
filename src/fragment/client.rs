@@ -1,4 +1,4 @@
-use crate::app::ClientState;
+use crate::{app::ClientState, settings::GameSettings};
 use bevy::prelude::*;
 use lightyear::{prediction::Predicted, prelude::PeerId};
 
@@ -59,6 +59,7 @@ pub(crate) fn simulate_client_fragments(
         (With<ClientFragment>, Without<ServerFragment>),
     >,
     players: Query<(&PlayerId, &PlayerPosition, Has<Predicted>)>,
+    settings: Res<GameSettings>,
 ) {
     for (fragment, mut position) in &mut fragments {
         let Some(collector) = fragment.collector else {
@@ -69,7 +70,7 @@ pub(crate) fn simulate_client_fragments(
             continue;
         };
 
-        fragment_shared::pull_fragment_toward(&mut position, target);
+        fragment_shared::pull_fragment_toward(&mut position, target, &settings.fragment);
     }
 }
 

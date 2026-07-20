@@ -4,12 +4,8 @@ use crate::{
     app::ServerState,
     enemy::{api::SpawnEnemy, server::EnemySpawnSet, EnemyHealth, EnemyPosition},
     protocol::rooms::{GameRoom, GameRooms},
+    settings::GameSettings,
 };
-
-const ENEMY_LIMIT: usize = 50;
-const MAX_SPAWNS_PER_TICK: usize = 20;
-const SPAWN_CANDIDATE_COUNT: usize = 32;
-const WORLD_RADIUS: f32 = 500.0;
 
 pub struct WorldServerPlugin;
 
@@ -25,6 +21,7 @@ impl Plugin for WorldServerPlugin {
 }
 
 fn run_enemy_spawner(
+    settings: Res<GameSettings>,
     enemies: Query<(&EnemyPosition, &EnemyHealth, &GameRoom)>,
     mut spawn_messages: MessageWriter<SpawnEnemy>,
 ) {
@@ -34,20 +31,17 @@ fn run_enemy_spawner(
         .map(|(position, _, _)| position.0)
         .collect();
 
-    let missing_enemy_count = ENEMY_LIMIT.saturating_sub(occupied_positions.len());
-    let spawn_count = missing_enemy_count.min(MAX_SPAWNS_PER_TICK);
+    let missing_enemy_count = settings.enemy.limit.saturating_sub(occupied_positions.len());
+    let spawn_count = missing_enemy_count.min(settings.enemy.max_spawns_per_tick);
 
     for _ in 0..spawn_count {
         let spawn_position = find_spawn_location_candidate(
             &occupied_positions,
-            WORLD_RADIUS,
-            SPAWN_CANDIDATE_COUNT,
+            settings.world.world_radius,
+            settings.enemy.spawn_candidate_count,
         );
         occupied_positions.push(spawn_position);
-        spawn_messages.write(
-            SpawnEnemy::new(
-            spawn_position,
-        ));
+        spawn_messages.write(SpawnEnemy::new(spawn_position));
     }
 }
 

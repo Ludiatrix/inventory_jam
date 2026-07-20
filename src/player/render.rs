@@ -4,6 +4,7 @@ use crate::player::protocol::{
     SmoothedAimDirection,
 };
 use crate::player::{PlayerColor, PlayerUsername};
+use crate::settings::GameSettings;
 use bevy::app::{App, Plugin, Update};
 use bevy::camera::{Camera, Camera2d};
 use bevy::color::Color;
@@ -17,9 +18,6 @@ use bevy::sprite::Anchor;
 use bevy::window::PrimaryWindow;
 use lightyear::prediction::Predicted;
 
-/// How quickly should the camera snap to the desired location
-const CAMERA_DECAY_RATE: f32 = 5.;
-const USERNAME_LABEL_OFFSET: Vec3 = Vec3::new(0.0, 40.0, 10.0);
 
 pub struct PlayerRenderPlugin;
 
@@ -52,6 +50,7 @@ struct UsernameLabel {
 }
 
 pub(crate) fn draw_player_boxes(
+    settings: Res<GameSettings>,
     mut gizmos: Gizmos,
     players: Query<(&PlayerPosition, &PlayerColor, &PlayerHealth), With<PlayerVisual>>,
 ) {
@@ -62,11 +61,12 @@ pub(crate) fn draw_player_boxes(
             color.0,
         );
 
-        draw_health_bar(&mut gizmos, position, health);
+        draw_health_bar(&settings, &mut gizmos, position, health);
     }
 }
 
 fn sync_username_labels(
+    settings: Res<GameSettings>,
     mut commands: Commands,
     players: Query<(Entity, &PlayerPosition, &PlayerUsername), With<PlayerVisual>>,
     mut labels: Query<(Entity, &UsernameLabel, &mut Transform, &mut Text2d)>,
@@ -76,7 +76,7 @@ fn sync_username_labels(
             .iter_mut()
             .find(|(_, label, _, _)| label.player == player)
         {
-            transform.translation = position.0.extend(0.0) + USERNAME_LABEL_OFFSET;
+            transform.translation = position.0.extend(0.0) + settings.player.username_label_offset;
             if text.0 != username.0 {
                 text.0.clone_from(&username.0);
             }
@@ -92,7 +92,7 @@ fn sync_username_labels(
             },
             TextColor(Color::WHITE),
             Anchor::BOTTOM_CENTER,
-            Transform::from_translation(position.0.extend(0.0) + USERNAME_LABEL_OFFSET),
+            Transform::from_translation(position.0.extend(0.0) + settings.player.username_label_offset),
         ));
     }
 
@@ -108,12 +108,13 @@ fn update_camera(
     mut camera: Single<&mut Transform, With<Camera2d>>,
     player: Single<&PlayerPosition, With<Predicted>>,
     time: Res<Time>,
+    settings: Res<GameSettings>,
 ) {
     let target = player.0.extend(camera.translation.z);
 
     camera
         .translation
-        .smooth_nudge(&target, CAMERA_DECAY_RATE, time.delta_secs());
+        .smooth_nudge(&target, settings.player.camera_decay_rate, time.delta_secs());
 }
 
 fn sample_cursor_aim(
@@ -143,11 +144,10 @@ fn sample_cursor_aim(
 }
 
 fn draw_local_aimstick(
+    settings: Res<GameSettings>,
     mut gizmos: Gizmos,
     players: Query<(&PlayerPosition, &SmoothedAimDirection), With<Predicted>>,
 ) {
-    const AIM_STICK_LENGTH: f32 = 32.0;
-
     for (position, smoothed_aim) in &players {
         let direction = smoothed_aim.0.normalize_or_zero();
 
@@ -156,7 +156,7 @@ fn draw_local_aimstick(
         }
 
         let start = position.0;
-        let end = start + direction * AIM_STICK_LENGTH;
+        let end = start + direction * settings.player.aim_stick_length;
 
         gizmos.line_2d(start, end, Color::srgb(1.0, 0.85, 0.2));
         gizmos.circle_2d(
@@ -168,12 +168,12 @@ fn draw_local_aimstick(
 }
 
 fn smooth_local_aim_visual(
+    settings: Res<GameSettings>,
     time: Res<Time>,
     mut players: Query<(&PlayerAimDirection, &mut SmoothedAimDirection), With<Predicted>>,
 ) {
-    const AIM_VISUAL_SMOOTH_RATE: f32 = 35.0;
-
-    let t = 1.0 - (-AIM_VISUAL_SMOOTH_RATE * time.delta_secs()).exp();
+    let t = 1.0
+        - (-settings.player.aim_visual_smooth_rate * time.delta_secs()).exp();
 
     for (target, mut smoothed) in &mut players {
         let target_direction = target.0.normalize_or_zero();
@@ -186,10 +186,12 @@ fn smooth_local_aim_visual(
     }
 }
 
-fn draw_health_bar(gizmos: &mut Gizmos<'_, '_>, position: &PlayerPosition, health: &PlayerHealth) {
-    const BAR_WIDTH: f32 = 50.0;
-    const BAR_HEIGHT: f32 = 5.0;
-    const BAR_OFFSET_Y: f32 = 34.0;
+fn draw_health_bar(
+    settings: &GameSettings,
+    gizmos: &mut Gizmos<'_, '_>,
+    position: &PlayerPosition,
+    health: &PlayerHealth,
+) {
 
     let health_fraction = if health.maximum == 0 {
         0.0
@@ -197,10 +199,10 @@ fn draw_health_bar(gizmos: &mut Gizmos<'_, '_>, position: &PlayerPosition, healt
         (health.current as f32 / health.maximum as f32).clamp(0.0, 1.0)
     };
 
-    let background_center = position.0 + Vec2::new(0.0, BAR_OFFSET_Y);
+    let background_center = position.0 + Vec2::new(0.0, settings.player.health_bar_offset_y);
     gizmos.rect_2d(
         Isometry2d::from_translation(background_center),
-        Vec2::new(BAR_WIDTH, BAR_HEIGHT),
+        Vec2::new(settings.player.health_bar_width, settings.player.health_bar_height),
         Color::srgb(0.2, 0.05, 0.05),
     );
 
@@ -208,9 +210,13 @@ fn draw_health_bar(gizmos: &mut Gizmos<'_, '_>, position: &PlayerPosition, healt
         return;
     }
 
-    let foreground_size = Vec2::new(BAR_WIDTH * health_fraction, BAR_HEIGHT);
+    let foreground_size = Vec2::new(
+        settings.player.health_bar_width * health_fraction,
+        settings.player.health_bar_height,
+    );
     let foreground_center = position.0
-        + Vec2::new((foreground_size.x - BAR_WIDTH) * 0.5, BAR_OFFSET_Y);
+        + Vec2::new((foreground_size.x - settings.player.health_bar_width) * 0.5,
+            settings.player.health_bar_offset_y);
 
     gizmos.rect_2d(
         Isometry2d::from_translation(foreground_center),

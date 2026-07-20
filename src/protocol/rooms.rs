@@ -1,4 +1,4 @@
-use crate::shared::{ARENA_WORLD_BOUNDS, SAFEZONE_WORLD_BOUNDS};
+use crate::settings::WorldSettings;
 use bevy::math::Rect;
 use bevy::prelude::{Component, Deref, DerefMut};
 use bevy::reflect::Reflect;
@@ -18,10 +18,10 @@ pub(crate) struct GameRoom {
 }
 
 impl GameRoom {
-    pub fn bounds(&self) -> Rect {
+    pub fn bounds(&self, settings: &WorldSettings) -> Rect {
         match self.room {
-            GameRooms::Arena => ARENA_WORLD_BOUNDS,
-            GameRooms::Safezone => SAFEZONE_WORLD_BOUNDS,
+            GameRooms::Arena => settings.arena_bounds(),
+            GameRooms::Safezone => settings.safezone_bounds(),
         }
     }
 }

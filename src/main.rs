@@ -12,6 +12,7 @@ mod shared;
 mod ui;
 mod weapon;
 mod world;
+mod settings;
 
 use app::*;
 use bevy::log::{Level, LogPlugin};
@@ -28,9 +29,10 @@ use projectile::ProjectilePlugin;
 #[cfg(feature = "server")]
 use server::ExampleServerPlugin;
 use shared::SharedPlugin;
-use std::time::Duration;
+use std::{process::ExitCode, time::Duration};
 use weapon::WeaponPlugin;
 use world::WorldPlugin;
+use crate::settings::{GameSettings, GameSettingsLoadError};
 
 use crate::ui::UiPlugin;
 
@@ -40,10 +42,23 @@ const TICK_DURATION: Duration =
 #[cfg(not(feature = "gui"))]
 const HEADLESS_CLIENT_LOOP_HZ: f64 = 60.0;
 
-fn main() {
+fn main() -> ExitCode {
+    match run() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("Application startup failed: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn run() -> Result<(), GameSettingsLoadError> {
+    let settings = GameSettings::load("assets/game_settings.json")?;
+
     let config = config_from_env();
     let mut app = base_app();
-    app.insert_resource(config.clone())
+    app.insert_resource(settings)
+        .insert_resource(config.clone())
         .insert_resource(LocalUsername(config.username.clone()));
 
     #[cfg(feature = "server")]
@@ -82,6 +97,7 @@ fn main() {
         .add_plugins(ExampleServerPlugin);
 
     app.run();
+    Ok(())
 }
 
 fn base_app() -> App {
