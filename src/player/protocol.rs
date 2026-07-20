@@ -1,8 +1,9 @@
-use crate::protocol::rooms::GameRoom;
 #[cfg(feature = "server")]
 use crate::protocol::rooms::GameRooms;
+use crate::protocol::{inputs::PlayerAction, rooms::GameRoom};
 use bevy::math::Curve;
 use bevy::prelude::*;
+use leafwing_input_manager::action_state::ActionState;
 use lightyear::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -15,6 +16,7 @@ impl Plugin for PlayerProtocolPlugin {
     fn build(&self, app: &mut App) {
         app.component::<PlayerId>().replicate();
 
+        app.add_systems(PostUpdate, debug_player_position);
         app.component::<PlayerPosition>()
             .replicate()
             .predict()
@@ -27,6 +29,27 @@ impl Plugin for PlayerProtocolPlugin {
         app.component::<GameRoom>().replicate();
 
         app.component::<PlayerUsername>().replicate();
+
+        app.component::<PlayerHealth>().replicate().predict();
+    }
+}
+
+#[allow(unused)]
+fn debug_player_position(
+    q: Query<(Entity, &PlayerPosition, &ActionState<PlayerAction>)>,
+    local_timeline: Res<LocalTimeline>,
+) {
+    for (entity, position, actions) in q.iter() {
+        let movement = actions.clamped_axis_pair(&PlayerAction::Move);
+
+        if movement != Vec2::ZERO {
+            // info!(
+            //     "Player Pos: {:?} {:?} {:?}",
+            //     local_timeline.tick(),
+            //     position,
+            //     entity
+            // );
+        }
     }
 }
 
@@ -39,6 +62,7 @@ pub(crate) struct PlayerBundle {
     aim_direction: PlayerAimDirection,
     game_room: GameRoom,
     username: PlayerUsername,
+    health: PlayerHealth,
 }
 
 #[cfg(feature = "server")]
@@ -56,6 +80,7 @@ impl PlayerBundle {
                 room: GameRooms::Arena,
             },
             username: PlayerUsername(temporary_username(id.to_bits())),
+            health: PlayerHealth::new(100),
         }
     }
 }
@@ -90,10 +115,28 @@ pub struct PlayerColor(pub(crate) Color);
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq, Deref)]
 pub struct PlayerUsername(pub String);
 
-#[derive(Component, Clone, Copy, Debug)]
-pub(crate) struct CachedCursorAim(pub Vec2);
+#[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PlayerHealth {
+    pub current: u32,
+    pub maximum: u32,
+}
 
-impl Default for CachedCursorAim {
+impl PlayerHealth {
+    pub const fn new(maximum: u32) -> Self {
+        Self {
+            current: maximum,
+            maximum,
+        }
+    }
+}
+
+#[derive(Component, Clone, Copy, Debug, Default)]
+pub(crate) struct PlayerVisual;
+
+#[derive(Resource, Clone, Copy, Debug)]
+pub(crate) struct LocalAimInput(pub Vec2);
+
+impl Default for LocalAimInput {
     fn default() -> Self {
         Self(Vec2::X)
     }

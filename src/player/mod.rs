@@ -1,10 +1,11 @@
 #[cfg(feature = "client")]
 mod client;
-mod protocol;
+pub mod protocol;
 #[cfg(feature = "gui")]
 mod render;
 #[cfg(feature = "server")]
 mod server;
+pub mod shared;
 
 use bevy::app::{App, Plugin};
 

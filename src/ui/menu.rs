@@ -1,16 +1,16 @@
 //! Main menu UI: username entry and connection actions.
 
-use crate::app::{AppState, LaunchMode, LocalUsername, MAX_USERNAME_LEN, StartGame};
+use crate::app::{ClientState, LaunchMode, LocalUsername, MAX_USERNAME_LEN, StartGame};
+#[cfg(feature = "server")]
+use crate::app::ServerState;
 use crate::networking::ConnectionStatus;
+use crate::settings::GameSettings;
 use bevy::color::palettes::tailwind::{SLATE_300, SLATE_700, SLATE_900};
 use bevy::input_focus::AutoFocus;
 use bevy::input_focus::tab_navigation::{TabGroup, TabIndex, TabNavigationPlugin};
 use bevy::prelude::*;
 use bevy::text::{EditableText, TextCursorStyle};
 
-const NORMAL_BUTTON: Color = Color::srgb(0.18, 0.2, 0.24);
-const HOVERED_BUTTON: Color = Color::srgb(0.28, 0.32, 0.38);
-const PRESSED_BUTTON: Color = Color::srgb(0.12, 0.55, 0.35);
 
 #[derive(Component)]
 struct MenuRoot;
@@ -35,20 +35,24 @@ pub struct MenuPlugin;
 impl Plugin for MenuPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(TabNavigationPlugin);
-        app.add_systems(OnEnter(AppState::MainMenu), spawn_main_menu);
-        app.add_systems(OnEnter(AppState::Connecting), spawn_connecting_overlay);
-        app.add_systems(OnExit(AppState::MainMenu), despawn_menu_ui);
-        app.add_systems(OnExit(AppState::Connecting), despawn_menu_ui);
+        app.add_systems(OnEnter(ClientState::Disconnected), spawn_main_menu);
+        app.add_systems(OnEnter(ClientState::Connecting), spawn_connecting_overlay);
+        app.add_systems(OnExit(ClientState::Disconnected), despawn_menu_ui);
+        app.add_systems(OnExit(ClientState::Connecting), despawn_menu_ui);
+        #[cfg(feature = "server")]
+        app.add_systems(OnEnter(ServerState::Hosting), despawn_menu_ui);
         app.add_systems(
             Update,
             (style_menu_buttons, handle_menu_buttons, sync_status_text)
-                .run_if(in_state(AppState::MainMenu).or_else(in_state(AppState::Connecting))),
+                .run_if(in_state(ClientState::Disconnected).or_else(in_state(ClientState::Connecting)))
+                .run_if(not_hosting),
         );
     }
 }
 
 fn spawn_main_menu(
     mut commands: Commands,
+    settings: Res<GameSettings>,
     username: Res<LocalUsername>,
     status: Res<ConnectionStatus>,
 ) {
@@ -103,12 +107,13 @@ fn spawn_main_menu(
             ))
             .id(),
         input,
-        menu_button(&mut commands, MenuButton::Join, "Join", 1),
+        menu_button(&mut commands, &settings, MenuButton::Join, "Join", 1),
     ];
 
     #[cfg(all(feature = "dev", feature = "server", not(target_family = "wasm")))]
     children.push(menu_button(
         &mut commands,
+        &settings,
         MenuButton::HostLocal,
         "Host Local Server",
         2,
@@ -116,6 +121,7 @@ fn spawn_main_menu(
     #[cfg(all(feature = "dev", feature = "client", not(target_family = "wasm")))]
     children.push(menu_button(
         &mut commands,
+        &settings,
         MenuButton::JoinLocal,
         "Join Local Server",
         3,
@@ -209,7 +215,23 @@ fn despawn_menu_ui(mut commands: Commands, roots: Query<Entity, With<MenuRoot>>)
     }
 }
 
-fn menu_button(commands: &mut Commands, action: MenuButton, label: &str, tab: i32) -> Entity {
+#[cfg(feature = "server")]
+fn not_hosting(server_state: Res<State<ServerState>>) -> bool {
+    *server_state.get() != ServerState::Hosting
+}
+
+#[cfg(not(feature = "server"))]
+fn not_hosting() -> bool {
+    true
+}
+
+fn menu_button(
+    commands: &mut Commands,
+    settings: &GameSettings,
+    action: MenuButton,
+    label: &str,
+    tab: i32,
+) -> Entity {
     commands
         .spawn((
             Button,
@@ -224,7 +246,7 @@ fn menu_button(commands: &mut Commands, action: MenuButton, label: &str, tab: i3
                 ..default()
             },
             BorderColor::all(Color::from(SLATE_700)),
-            BackgroundColor(NORMAL_BUTTON),
+            BackgroundColor(settings.menu.normal_button),
             children![(
                 Text::new(label.to_string()),
                 TextFont {
@@ -237,6 +259,7 @@ fn menu_button(commands: &mut Commands, action: MenuButton, label: &str, tab: i3
 }
 
 fn style_menu_buttons(
+    settings: Res<GameSettings>,
     mut buttons: Query<
         (&Interaction, &mut BackgroundColor, &mut BorderColor),
         (Changed<Interaction>, With<MenuButton>),
@@ -245,15 +268,15 @@ fn style_menu_buttons(
     for (interaction, mut background, mut border) in &mut buttons {
         match *interaction {
             Interaction::Pressed => {
-                *background = PRESSED_BUTTON.into();
+                *background = settings.menu.pressed_button.into();
                 *border = BorderColor::all(Color::srgb(0.4, 0.9, 0.55));
             }
             Interaction::Hovered => {
-                *background = HOVERED_BUTTON.into();
+                *background = settings.menu.hovered_button.into();
                 *border = BorderColor::all(Color::WHITE);
             }
             Interaction::None => {
-                *background = NORMAL_BUTTON.into();
+                *background = settings.menu.normal_button.into();
                 *border = BorderColor::all(Color::from(SLATE_700));
             }
         }
@@ -299,7 +322,7 @@ fn handle_menu_buttons(
             #[cfg(all(feature = "dev", feature = "server", not(target_family = "wasm")))]
             MenuButton::HostLocal => {
                 starts.write(StartGame {
-                    mode: LaunchMode::HostLocal,
+                    mode: LaunchMode::DedicatedServer,
                     username: String::new(),
                 });
             }

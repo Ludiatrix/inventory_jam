@@ -1,33 +1,77 @@
-use crate::app::AppState;
-use crate::player::protocol::{PlayerAimDirection, PlayerBundle, PlayerPosition};
+use crate::app::ServerState;
+use crate::enemy::{EnemyHealth, EnemyPosition};
+use crate::player::protocol::{
+    PlayerAimDirection, PlayerBundle, PlayerHealth, PlayerPosition, PlayerVisual,
+};
+use crate::player::shared::player_movement;
 use crate::protocol::inputs::PlayerAction;
 use crate::protocol::rooms::{GameRoom, GameRooms};
-use crate::shared;
 use crate::shared::FixedGameplaySet;
+use crate::settings::GameSettings;
 use bevy::prelude::*;
+use bevy::window::PrimaryWindow;
 use leafwing_input_manager::prelude::*;
 use lightyear::connection::client::Connected;
 use lightyear::connection::client_of::ClientOf;
-use lightyear::connection::host::HostServer;
 use lightyear::prelude::*;
+use rand::Rng;
+
+
+#[derive(Component, Clone, Copy, Debug, Default)]
+struct EnemyContactDamageCooldown {
+    remaining_seconds: f32,
+}
+
+/// Controls where newly connected players appear.
+///
+/// `Annulus` chooses a random point between `minimum_radius` and
+/// `maximum_radius` from `center`. Set both radii to the same value to spawn at
+/// an exact distance from the center.
+///
+/// `Fixed` always uses the requested position, clamped inside the room bounds.
+#[derive(Resource, Clone, Copy, Debug)]
+pub enum PlayerSpawnMode {
+    Annulus {
+        center: Vec2,
+        minimum_radius: f32,
+        maximum_radius: f32,
+    },
+    Fixed(Vec2),
+}
+
+impl Default for PlayerSpawnMode {
+    fn default() -> Self {
+        Self::Annulus {
+            center: Vec2::ZERO,
+            minimum_radius: 350.0,
+            maximum_radius: 500.0,
+        }
+    }
+}
 
 pub struct PlayerServerPlugin;
 
 impl Plugin for PlayerServerPlugin {
     fn build(&self, app: &mut App) {
+        app.init_resource::<PlayerSpawnMode>();
         app.add_observer(handle_connected);
 
         app.add_systems(
             FixedUpdate,
-            (authoritative_player_movement, update_player_aim_direction)
+            (
+                player_movement,
+                update_player_aim_direction,
+                apply_enemy_contact_damage,
+                control_dedicated_server_camera
+            )
                 .chain()
                 .in_set(FixedGameplaySet::Player)
-                .run_if(in_state(AppState::Hosting)),
+                .run_if(in_state(ServerState::Hosting)),
         );
 
         app.add_systems(
             FixedUpdate,
-            debug_switch_rooms.run_if(in_state(AppState::Hosting)),
+            debug_switch_rooms.run_if(in_state(ServerState::Hosting)),
         );
     }
 }
@@ -35,6 +79,8 @@ impl Plugin for PlayerServerPlugin {
 pub(crate) fn handle_connected(
     trigger: On<Add, Connected>,
     query: Query<&RemoteId, With<ClientOf>>,
+    spawn_mode: Res<PlayerSpawnMode>,
+    settings: Res<GameSettings>,
     mut commands: Commands,
 ) {
     let Ok(client_id) = query.get(trigger.entity) else {
@@ -42,11 +88,17 @@ pub(crate) fn handle_connected(
     };
 
     let client_id = client_id.0;
+    let room = GameRoom {
+        room: GameRooms::Arena,
+    };
+    let spawn_position = choose_player_spawn(*spawn_mode, room, &settings);
 
     let entity = commands
         .spawn((
             Name::new(format!("Player: {}", client_id)),
-            PlayerBundle::new(client_id, Vec2::ZERO),
+            PlayerBundle::new(client_id, spawn_position),
+            PlayerVisual,
+            EnemyContactDamageCooldown::default(),
             ActionState::<PlayerAction>::default(),
             Replicate::to_clients(NetworkTarget::All),
             PredictionTarget::to_clients(NetworkTarget::Single(client_id)),
@@ -58,59 +110,112 @@ pub(crate) fn handle_connected(
         ))
         .id();
 
-    info!("Create player entity {entity:?} for client {client_id:?}");
+    info!(?entity, ?client_id, ?spawn_position, "Created player entity");
 }
 
-pub(crate) fn authoritative_player_movement(
-    timeline: Res<LocalTimeline>,
-    host_server: Query<(), With<HostServer>>,
-    mut position_query: Query<(
-        &mut PlayerPosition,
-        &GameRoom,
-        &ActionState<PlayerAction>,
-        Has<Predicted>,
-    )>,
-) {
-    let is_host_server = !host_server.is_empty();
-    let _tick = timeline.tick();
+fn choose_player_spawn(
+    mode: PlayerSpawnMode,
+    room: GameRoom,
+    settings: &GameSettings,
+) -> Vec2 {
+    let bounds = room
+        .bounds(&settings.world)
+        .inflate(-settings.player.half_size);
 
-    for (position, room, actions, predicted) in position_query.iter_mut() {
-        if is_host_server && predicted {
-            continue;
+    match mode {
+        PlayerSpawnMode::Fixed(position) => position.clamp(bounds.min, bounds.max),
+        PlayerSpawnMode::Annulus {
+            center,
+            minimum_radius,
+            maximum_radius,
+        } => {
+            let minimum_radius = minimum_radius.max(0.0);
+            let maximum_radius = maximum_radius.max(minimum_radius);
+            let mut rng = rand::rng();
+
+            for _ in 0..settings.player.spawn_attempts {
+                let angle = rng.random_range(0.0..std::f32::consts::TAU);
+                let radius_squared = rng.random_range(
+                    minimum_radius * minimum_radius..=maximum_radius * maximum_radius,
+                );
+                let radius = radius_squared.sqrt();
+                let candidate = center + Vec2::new(angle.cos(), angle.sin()) * radius;
+
+                if bounds.contains(candidate) {
+                    return candidate;
+                }
+            }
+
+            // A malformed or impossible annulus still produces a valid position.
+            center.clamp(bounds.min, bounds.max)
         }
-
-        if actions.just_pressed(&PlayerAction::Fire) {
-            //info!(tick = tick.0, "SERVER received Fire");
-        }
-
-        if actions.just_pressed(&PlayerAction::Interact) {
-            //info!(tick = tick.0, "SERVER received Interact");
-        }
-
-        shared::shared_movement_behaviour(position, room, actions);
     }
 }
 
 pub(crate) fn update_player_aim_direction(
-    mut players: Query<(
-        &ActionState<PlayerAction>,
-        &mut PlayerAimDirection,
-        Has<Predicted>,
-    )>,
-    host_server: Query<(), With<HostServer>>,
+    mut players: Query<(&ActionState<PlayerAction>, &mut PlayerAimDirection)>,
 ) {
-    let is_host_server = !host_server.is_empty();
-
-    for (actions, mut aim_direction, predicted) in &mut players {
-        if is_host_server && predicted {
-            continue;
-        }
-
+    for (actions, mut aim_direction) in &mut players {
         let aim = actions.clamped_axis_pair(&PlayerAction::Aim);
 
         if aim.length_squared() > 0.0001 {
             aim_direction.0 = aim.normalize_or_zero();
         }
+    }
+}
+
+fn apply_enemy_contact_damage(
+    time: Res<Time>,
+    mut players: Query<
+        (
+            Entity,
+            &PlayerPosition,
+            &GameRoom,
+            &mut PlayerHealth,
+            &mut EnemyContactDamageCooldown,
+        ),
+        With<ControlledBy>,
+    >,
+    enemies: Query<(&EnemyPosition, &EnemyHealth)>,
+    settings: Res<GameSettings>,
+) {
+    for (player_entity, player_position, room, mut health, mut cooldown) in &mut players {
+        cooldown.remaining_seconds =
+            (cooldown.remaining_seconds - time.delta_secs()).max(0.0);
+
+        if room.room != GameRooms::Arena
+            || health.current == 0
+            || cooldown.remaining_seconds > 0.0
+        {
+            continue;
+        }
+
+        let touching_enemy = enemies.iter().any(|(enemy_position, enemy_health)| {
+            if enemy_health.current == 0 {
+                return false;
+            }
+
+            let collision_radius = settings.player.collision_radius + settings.enemy.collision_radius;
+            player_position.0.distance_squared(enemy_position.0)
+                <= collision_radius * collision_radius
+        });
+
+        if !touching_enemy {
+            continue;
+        }
+
+        health.current = health
+            .current
+            .saturating_sub(settings.player.enemy_contact_damage);
+        cooldown.remaining_seconds = settings.player.enemy_contact_damage_interval_seconds;
+
+        info!(
+            ?player_entity,
+            damage = settings.player.enemy_contact_damage,
+            current_health = health.current,
+            maximum_health = health.maximum,
+            "Player took enemy contact damage"
+        );
     }
 }
 
@@ -120,9 +225,121 @@ pub(crate) fn debug_switch_rooms(
     for (actions, mut room) in &mut player_query {
         if actions.just_pressed(&PlayerAction::DebugSwitchRooms) {
             room.room = match room.room {
-                GameRooms::Arena => GameRooms::Pit,
-                GameRooms::Pit => GameRooms::Arena,
+                GameRooms::Arena => GameRooms::Safezone,
+                GameRooms::Safezone => GameRooms::Arena,
             }
         }
+    }
+}
+
+fn control_dedicated_server_camera(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
+    window: Single<&Window, With<PrimaryWindow>>,
+    mut camera: Single<(&mut Transform, &mut Projection), With<Camera2d>>,
+    settings: Res<GameSettings>,
+) {
+    let (mut camera_transform, mut projection) = camera.into_inner();
+    let Projection::Orthographic(ref mut orthographic) = *projection else {
+        return;
+    };
+
+    let dt = time.delta_secs();
+
+    let zoom_axis = if keyboard.pressed(KeyCode::Minus) {
+        1.0
+    } else if keyboard.pressed(KeyCode::Equal) {
+        -1.0
+    } else {
+        0.0
+    };
+
+    if zoom_axis != 0.0 {
+        orthographic.scale = (orthographic.scale * (settings.server_camera.zoom_speed * zoom_axis * dt).exp())
+            .clamp(
+                settings.server_camera.min_scale,
+                settings.server_camera.max_scale,
+            );
+    }
+
+    if keyboard.just_pressed(KeyCode::Digit0) {
+        orthographic.scale = 1.0;
+    }
+
+    if keyboard.just_pressed(KeyCode::KeyF) {
+        frame_server_world(&mut camera_transform, orthographic, &window, &settings);
+    }
+
+    let horizontal = axis(
+        &keyboard,
+        KeyCode::KeyA,
+        KeyCode::KeyD,
+        KeyCode::ArrowLeft,
+        KeyCode::ArrowRight,
+    );
+    let vertical = axis(
+        &keyboard,
+        KeyCode::KeyS,
+        KeyCode::KeyW,
+        KeyCode::ArrowDown,
+        KeyCode::ArrowUp,
+    );
+
+    let direction = Vec2::new(horizontal, vertical).normalize_or_zero();
+    if direction != Vec2::ZERO {
+        let visible_world_height = window.height() * orthographic.scale;
+        camera_transform.translation +=
+            (direction
+                * visible_world_height
+                * settings.server_camera.pan_speed_in_screen_heights
+                * dt).extend(0.0);
+    }
+}
+
+fn frame_server_world(
+    camera_transform: &mut Transform,
+    orthographic: &mut OrthographicProjection,
+    window: &Window,
+    settings: &GameSettings,
+) {
+    let arena_bounds = settings.world.arena_bounds();
+    let safezone_bounds = settings.world.safezone_bounds();
+    let combined_bounds = Rect {
+        min: arena_bounds.min.min(safezone_bounds.min),
+        max: arena_bounds.max.max(safezone_bounds.max),
+    };
+
+    const VIEW_PADDING: f32 = 1.08;
+    let viewport_width = window.width().max(1.0);
+    let viewport_height = window.height().max(1.0);
+
+    let scale_for_width = combined_bounds.width() / viewport_width;
+    let scale_for_height = combined_bounds.height() / viewport_height;
+
+    orthographic.scale = scale_for_width.max(scale_for_height) * VIEW_PADDING;
+    camera_transform.translation.x = combined_bounds.center().x;
+    camera_transform.translation.y = combined_bounds.center().y;
+}
+
+fn axis(
+    keyboard: &ButtonInput<KeyCode>,
+    negative: KeyCode,
+    positive: KeyCode,
+    alternate_negative: KeyCode,
+    alternate_positive: KeyCode,
+) -> f32 {
+    let negative_pressed = keyboard.pressed(negative) || keyboard.pressed(alternate_negative);
+    let positive_pressed = keyboard.pressed(positive) || keyboard.pressed(alternate_positive);
+
+    positive_pressed as i8 as f32 - negative_pressed as i8 as f32
+}
+
+fn draw_world_boundaries(settings: Res<GameSettings>, mut gizmos: Gizmos) {
+    for bounds in [settings.world.arena_bounds(), settings.world.safezone_bounds()] {
+        gizmos.rect_2d(
+            Isometry2d::from_translation(bounds.center()),
+            bounds.size(),
+            Color::srgb(0.95, 0.25, 0.2),
+        );
     }
 }

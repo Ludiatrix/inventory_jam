@@ -9,7 +9,7 @@ use bevy::prelude::*;
 use lightyear::prelude::*;
 
 #[cfg(feature = "server")]
-use crate::app::AppState;
+use crate::app::ServerState;
 #[cfg(feature = "server")]
 use crate::shared::FixedGameplaySet;
 
@@ -81,7 +81,7 @@ impl Plugin for PersistenceServerPlugin {
                 FixedUpdate,
                 apply_persistence_transactions
                     .in_set(FixedGameplaySet::Persistence)
-                    .run_if(in_state(AppState::Hosting)),
+                    .run_if(in_state(ServerState::Hosting)),
             )
             .add_systems(
                 Update,
@@ -91,7 +91,7 @@ impl Plugin for PersistenceServerPlugin {
                     flush_persistence_queue,
                 )
                     .chain()
-                    .run_if(in_state(AppState::Hosting)),
+                    .run_if(in_state(ServerState::Hosting)),
             );
     }
 }

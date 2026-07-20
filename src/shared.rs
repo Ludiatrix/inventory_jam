@@ -1,15 +1,7 @@
-use crate::player::PlayerPosition;
-use crate::protocol::ProtocolPlugin;
-use crate::protocol::inputs::PlayerAction;
-use crate::protocol::rooms::GameRoom;
+use crate::{app::ServerState, protocol::ProtocolPlugin};
 use bevy::prelude::*;
-use leafwing_input_manager::prelude::*;
 
-pub static ARENA_WORLD_BOUNDS: Rect =
-    Rect::from_center_size(Vec2::new(0.0, 0.0), Vec2::new(1600.0, 1200.0));
-pub static SHOP_WORLD_BOUNDS: Rect =
-    Rect::from_center_size(Vec2::new(1700.0, 0.0), Vec2::new(1600.0, 1200.0));
-pub const PLAYER_HALF_SIZE: f32 = 25.0;
+pub const GAME_NAME: &str = "Arena of Champions";
 
 #[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FixedGameplaySet {
@@ -34,35 +26,17 @@ impl Plugin for SharedPlugin {
             )
                 .chain(),
         );
+
+        #[cfg(feature = "server")]
+        app.add_systems(FixedUpdate, update_window_title);
     }
 }
 
-pub(crate) fn shared_movement_behaviour(
-    mut position: Mut<PlayerPosition>,
-    room: &GameRoom,
-    actions: &ActionState<PlayerAction>,
-) {
-    const MOVE_SPEED: f32 = 10.0;
-
-    let movement = actions.clamped_axis_pair(&PlayerAction::Move);
-
-    if movement != Vec2::ZERO {
-        position.0 += movement * MOVE_SPEED;
-
-        let local_bounds = room.bounds().inflate(-PLAYER_HALF_SIZE);
-
-        position.0 = position.0.clamp(local_bounds.min, local_bounds.max);
-    }
-
-    if actions.just_pressed(&PlayerAction::Fire) {
-        //info!("Fire Pressed!");
-    }
-
-    if actions.just_pressed(&PlayerAction::Interact) {
-        //info!("Interact Pressed!");
-    }
-
-    if actions.just_pressed(&PlayerAction::UseSkill) {
-        //info!("UseSkill Pressed!");
+fn update_window_title(mut window_query: Query<&mut Window>, state: Res<State<ServerState>>) {
+    for mut window in window_query.iter_mut() {
+        match state.get() {
+            ServerState::Stopped => (),
+            ServerState::Hosting => window.title = format!("{}: Server", GAME_NAME),
+        }
     }
 }

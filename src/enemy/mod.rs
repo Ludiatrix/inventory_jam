@@ -2,7 +2,8 @@ mod protocol;
 #[cfg(feature = "gui")]
 mod render;
 #[cfg(feature = "server")]
-mod server;
+pub(crate) mod server;
+pub(crate) mod api;
 pub mod shared;
 
 use bevy::app::{App, Plugin};
