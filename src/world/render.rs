@@ -1,67 +1,105 @@
 use crate::app::game_is_active;
-use crate::shared::{ARENA_WORLD_BOUNDS, SHOP_WORLD_BOUNDS};
-use bevy::app::{App, Plugin, Update};
-use bevy::color::Color;
-use bevy::math::{Isometry2d, Rect, Vec2};
-use bevy::prelude::{Gizmos, IntoScheduleConfigs};
-
-const GRID_SPACING: f32 = 100.0;
+use crate::shared::{ARENA_WORLD_BOUNDS, SAFEZONE_WORLD_BOUNDS, TILE_PIXEL_SIZE};
+use bevy::prelude::*;
 
 pub struct WorldRenderPlugin;
 
 impl Plugin for WorldRenderPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, draw_test_worlds.run_if(game_is_active));
+        app.add_systems(Startup, setup_world_tiles);
+        app.add_systems(Update, draw_world_boundaries.run_if(game_is_active));
     }
 }
 
-fn draw_test_worlds(mut gizmos: Gizmos) {
-    draw_test_world(&mut gizmos, ARENA_WORLD_BOUNDS);
-    draw_test_world(&mut gizmos, SHOP_WORLD_BOUNDS);
-}
+#[derive(Component)]
+struct WorldTile;
 
-/// Draws a simple top-down test arena with a grid and visible boundaries.
-fn draw_test_world(gizmos: &mut Gizmos, bounds: Rect) {
-    let grid_color = Color::srgba(0.35, 0.38, 0.42, 0.35);
-    let axis_color = Color::srgba(0.7, 0.72, 0.75, 0.7);
-    let boundary_color = Color::srgb(0.95, 0.25, 0.2);
+fn setup_world_tiles(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut layouts: ResMut<Assets<TextureAtlasLayout>>,
+) {
+    let arena_image = asset_server.load("world_tiles/spr_tileset_arena_main.png");
+    let arena_layout = layouts.add(TextureAtlasLayout::from_grid(
+        UVec2::splat(16),
+        8,
+        11,
+        None,
+        None,
+    ));
 
-    // Vertical grid lines
-    let mut x = bounds.min.x;
-    while x <= bounds.max.x {
-        let color = if x.abs() < f32::EPSILON {
-            axis_color
-        } else {
-            grid_color
-        };
-        gizmos.line_2d(
-            Vec2::new(x, bounds.min.y),
-            Vec2::new(x, bounds.max.y),
-            color,
-        );
-        x += GRID_SPACING;
-    }
+    let safezone_image = asset_server.load("world_tiles/spr_tileset_safezone.png");
+    let safezone_layout = layouts.add(TextureAtlasLayout::from_grid(
+        UVec2::splat(16),
+        9,
+        9,
+        None,
+        None,
+    ));
 
-    // Horizontal grid lines
-    let mut y = bounds.min.y;
-    while y <= bounds.max.y {
-        let color = if y.abs() < f32::EPSILON {
-            axis_color
-        } else {
-            grid_color
-        };
-        gizmos.line_2d(
-            Vec2::new(bounds.min.x, y),
-            Vec2::new(bounds.max.x, y),
-            color,
-        );
-        y += GRID_SPACING;
-    }
-
-    // Boundary rectangle
-    gizmos.rect_2d(
-        Isometry2d::from_translation(bounds.center()),
-        bounds.size(),
-        boundary_color,
+    spawn_tiled_area(
+        &mut commands,
+        ARENA_WORLD_BOUNDS,
+        &arena_image,
+        &arena_layout,
+        &[27, 28, 35, 36, 43, 44, 51, 52],
+        0.0,
     );
+
+    spawn_tiled_area(
+        &mut commands,
+        SAFEZONE_WORLD_BOUNDS,
+        &safezone_image,
+        &safezone_layout,
+        &[39, 40, 41, 48, 49, 50],
+        0.0,
+    );
+}
+
+fn spawn_tiled_area(
+    commands: &mut Commands,
+    bounds: Rect,
+    image: &Handle<Image>,
+    layout: &Handle<TextureAtlasLayout>,
+    tile_indices: &[usize],
+    z: f32,
+) {
+    let columns = (bounds.width() / TILE_PIXEL_SIZE).ceil() as i32;
+    let rows = (bounds.height() / TILE_PIXEL_SIZE).ceil() as i32;
+    let scale = TILE_PIXEL_SIZE / 16.0;
+
+    for row in 0..rows {
+        for column in 0..columns {
+            let x = bounds.min.x + TILE_PIXEL_SIZE * (column as f32 + 0.5);
+            let y = bounds.min.y + TILE_PIXEL_SIZE * (row as f32 + 0.5);
+            let index = tile_indices[((row + column) as usize) % tile_indices.len()];
+
+            commands.spawn((
+                WorldTile,
+                Sprite::from_atlas_image(
+                    image.clone(),
+                    TextureAtlas {
+                        layout: layout.clone(),
+                        index,
+                    },
+                ),
+                Transform {
+                    translation: Vec3::new(x, y, z),
+                    scale: Vec3::splat(scale),
+                    ..default()
+                },
+                Name::new("World Tile"),
+            ));
+        }
+    }
+}
+
+fn draw_world_boundaries(mut gizmos: Gizmos) {
+    for bounds in [ARENA_WORLD_BOUNDS, SAFEZONE_WORLD_BOUNDS] {
+        gizmos.rect_2d(
+            Isometry2d::from_translation(bounds.center()),
+            bounds.size(),
+            Color::srgb(0.95, 0.25, 0.2),
+        );
+    }
 }
