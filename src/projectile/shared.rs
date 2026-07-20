@@ -7,9 +7,10 @@ use lightyear::{
 };
 
 use crate::{
-    enemy::{EnemyHealth, EnemyPosition}, fragment::api::SpawnFragmentPool, player::{PlayerId, PlayerPosition}, projectile::protocol::{PlayerProjectile, ProjectileImpact, ProjectilePosition}, protocol::rooms::GameRoom, settings::GameSettings,
+    enemy::{EnemyHealth, EnemyPosition}, fragment::api::SpawnFragmentPool, player::api::AddKillsToAristeia, player::{PlayerId, PlayerPosition}, projectile::protocol::{PlayerProjectile, ProjectileImpact, ProjectilePosition}, protocol::rooms::GameRoom, settings::GameSettings,
 };
-use crate::player::protocol::PlayerHealth;
+use crate::player::protocol::{PlayerAristeia, PlayerHealth};
+use crate::world::api::AddGlobalAristeia;
 
 pub struct SpawnProjectile {
     pub projectile: PlayerProjectile,
@@ -90,10 +91,13 @@ pub fn simulate_server_projectiles(
         &PlayerPosition,
         &GameRoom,
         &mut PlayerHealth,
+        &PlayerAristeia,
     )>,
     mut enemies: Query<(Entity, &EnemyPosition, &GameRoom, &mut EnemyHealth)>,
     local_timeline: Res<LocalTimeline>,
     mut fragment_drops: MessageWriter<SpawnFragmentPool>,
+    mut aristeia_tracking: MessageWriter<AddKillsToAristeia>,
+    mut global_aristeia: MessageWriter<AddGlobalAristeia>,
     settings: Res<GameSettings>,
 ) {
     for (projectile_entity, projectile, mut position, room) in &mut projectiles {
@@ -121,8 +125,20 @@ pub fn simulate_server_projectiles(
                 &settings,
             );
             if enemy_died {
-                fragment_drops.write(SpawnFragmentPool::new(position.0, 12, *room));
+                let personal_aristeia = players.iter()
+                    .find(|(_, player_id, _, _, _, _)| player_id.0 == projectile.owner)
+                    .map(|(_, _, _, _, _, aristeia)| aristeia.current)
+                    .unwrap_or(0);
+                let bonus = u32::from(settings.fragment.bonus_drops_per_aristeia)
+                    .saturating_mul(personal_aristeia);
+                let drop_count = u32::from(settings.fragment.base_drop_count)
+                    .saturating_add(bonus)
+                    .min(u32::from(settings.fragment.maximum_drop_count)) as u16;
+
+                fragment_drops.write(SpawnFragmentPool::new(position.0, drop_count, *room));
                 commands.entity(enemy_entity).despawn();
+                aristeia_tracking.write(AddKillsToAristeia::new(projectile.owner, 1));
+                global_aristeia.write(AddGlobalAristeia(settings.global_aristeia.contribution_per_kill));
             }
             continue;
         }
@@ -218,6 +234,7 @@ fn get_hit_player(
             &PlayerPosition,
             &GameRoom,
             &mut PlayerHealth,
+            &PlayerAristeia,
         ),
     >,
     projectile: &PlayerProjectile,
@@ -225,7 +242,7 @@ fn get_hit_player(
     projectile_room: &GameRoom,
     settings: &GameSettings,
 ) -> Option<Entity> {
-    for (player_entity, player_id, player_position, player_room, mut health) in players {
+    for (player_entity, player_id, player_position, player_room, mut health, _) in players {
         if player_id.0 == projectile.owner
             || player_room != projectile_room
             || health.current == 0

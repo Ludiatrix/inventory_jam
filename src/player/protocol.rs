@@ -31,6 +31,8 @@ impl Plugin for PlayerProtocolPlugin {
         app.component::<PlayerUsername>().replicate();
 
         app.component::<PlayerHealth>().replicate().predict();
+
+        app.component::<PlayerAristeia>().replicate().predict();
     }
 }
 
@@ -63,11 +65,16 @@ pub(crate) struct PlayerBundle {
     game_room: GameRoom,
     username: PlayerUsername,
     health: PlayerHealth,
+    aristeia: PlayerAristeia,
 }
 
 #[cfg(feature = "server")]
 impl PlayerBundle {
-    pub(crate) fn new(id: PeerId, position: Vec2) -> Self {
+    pub(crate) fn new(
+        id: PeerId,
+        position: Vec2,
+        aristeia_duration_ticks: u16,
+    ) -> Self {
         let h = (((id.to_bits().wrapping_mul(30)) % 360) as f32) / 360.0;
         let color = Color::hsl(h, 0.8, 0.5);
 
@@ -81,11 +88,12 @@ impl PlayerBundle {
             },
             username: PlayerUsername(temporary_username(id.to_bits())),
             health: PlayerHealth::new(100),
+            aristeia: PlayerAristeia::new(aristeia_duration_ticks),
         }
     }
 }
 
-#[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq, Copy)]
 pub struct PlayerId(pub PeerId);
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq, Reflect, Deref, DerefMut)]
@@ -116,7 +124,7 @@ pub struct PlayerColor(pub(crate) Color);
 pub struct PlayerUsername(pub String);
 
 #[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PlayerHealth {
+pub(crate) struct PlayerHealth {
     pub current: u32,
     pub maximum: u32,
 }
@@ -127,6 +135,46 @@ impl PlayerHealth {
             current: maximum,
             maximum,
         }
+    }
+}
+
+// Used for Killstreak Tracking
+#[derive(
+    Component,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+)]
+pub(crate) struct PlayerAristeia {
+    /// Current Aristeia kill count or multiplier level.
+    pub current: u32,
+
+    /// Remaining lifetime of the current Aristeia level, in fixed ticks.
+    pub remaining_ticks: u16,
+
+    /// Maximum lifetime used to calculate the UI bar fraction.
+    pub maximum_ticks: u16,
+}
+
+impl PlayerAristeia {
+    pub(crate) const fn new(duration_ticks: u16) -> Self {
+        Self {
+            current: 0,
+            remaining_ticks: 0,
+            maximum_ticks: duration_ticks,
+        }
+    }
+
+    pub fn remaining_fraction(&self) -> f32 {
+        if self.maximum_ticks == 0 {
+            return 0.0;
+        }
+
+        (self.remaining_ticks as f32 / self.maximum_ticks as f32)
+            .clamp(0.0, 1.0)
     }
 }
 

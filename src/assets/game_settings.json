@@ -12,7 +12,7 @@
     "despawn_distance_from_players": 1400.0,
     "move_speed_per_tick": 2.0,
     "wander_radius": 180.0,
-    "detection_radius": 250.0,
+    "detection_radius": 500.0,
     "leash_radius": 900.0
   },
   "fragment": {

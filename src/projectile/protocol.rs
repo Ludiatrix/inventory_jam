@@ -1,4 +1,4 @@
-use crate::weapon::protocol::WeaponKind;
+use crate::{player::PlayerId, weapon::protocol::WeaponKind};
 use bevy::prelude::{
     App, Component, Curve, Deref, DerefMut, Ease, FunctionCurve, Interval, Plugin, Vec2,
 };

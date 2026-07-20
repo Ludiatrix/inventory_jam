@@ -15,6 +15,7 @@ pub(crate) struct GameSettings {
     pub server_camera: ServerCameraSettings,
     pub projectile: ProjectileSettings,
     pub menu: MenuSettings,
+    pub global_aristeia: GlobalAristeiaSettings,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -26,6 +27,13 @@ pub struct EnemySettings {
     pub limit: usize,
     pub max_spawns_per_tick: usize,
     pub spawn_candidate_count: usize,
+    pub target_per_player: usize,
+    pub spawn_min_distance_from_player: f32,
+    pub despawn_distance_from_players: f32,
+    pub move_speed_per_tick: f32,
+    pub wander_radius: f32,
+    pub detection_radius: f32,
+    pub leash_radius: f32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -37,6 +45,9 @@ pub struct FragmentSettings {
     pub player_collection_radius: f32,
     pub pull_fraction_per_tick: f32,
     pub swirl_speed_per_tick: f32,
+    pub base_drop_count: u16,
+    pub bonus_drops_per_aristeia: u16,
+    pub maximum_drop_count: u16,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -58,6 +69,9 @@ pub struct PlayerSettings {
     pub collision_radius: f32,
     pub move_speed: f32,
     pub held_weapon_offset: f32,
+    pub aristeia_duration_ticks: u16,
+    pub aristeia_bar_width: f32,
+    pub aristeia_bar_height: f32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -114,6 +128,19 @@ pub struct ProjectileSettings {
     pub spawn_gap: f32,
 }
 
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GlobalAristeiaSettings {
+    pub threshold: u32,
+    pub contribution_per_kill: u32,
+    pub drain_interval_ticks: u16,
+    pub drain_amount: u32,
+    pub grand_champion_health: u32,
+    pub grand_champion_move_speed_per_tick: f32,
+    pub grand_champion_detection_radius: f32,
+    pub grand_champion_leash_radius: f32,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct MenuSettings {
     #[serde(deserialize_with = "deserialize_color")]
@@ -153,6 +180,16 @@ impl GameSettings {
                 "enemy size and collision radius must be greater than zero".into(),
             ));
         }
+        if self.enemy.spawn_min_distance_from_player > self.enemy.spawn_radius
+            || self.enemy.despawn_distance_from_players <= self.enemy.spawn_radius
+            || self.enemy.move_speed_per_tick <= 0.0
+            || self.enemy.detection_radius <= 0.0
+            || self.enemy.leash_radius < self.enemy.detection_radius
+        {
+            return Err(GameSettingsLoadError::Invalid(
+                "enemy population or movement settings are invalid".into(),
+            ));
+        }
         if self.fragment.pool_min_radius > self.fragment.pool_max_radius {
             return Err(GameSettingsLoadError::Invalid(
                 "fragment pool_min_radius cannot exceed pool_max_radius".into(),
@@ -161,6 +198,14 @@ impl GameSettings {
         if !(0.0..=1.0).contains(&self.fragment.pull_fraction_per_tick) {
             return Err(GameSettingsLoadError::Invalid(
                 "fragment pull_fraction_per_tick must be between 0 and 1".into(),
+            ));
+        }
+        if self.fragment.base_drop_count > self.fragment.maximum_drop_count
+            || self.global_aristeia.threshold == 0
+            || self.global_aristeia.drain_interval_ticks == 0
+        {
+            return Err(GameSettingsLoadError::Invalid(
+                "fragment drop or global Aristeia settings are invalid".into(),
             ));
         }
         if self.world.tile_pixel_size <= 0.0

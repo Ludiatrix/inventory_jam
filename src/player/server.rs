@@ -1,7 +1,9 @@
 use crate::app::ServerState;
 use crate::enemy::{EnemyHealth, EnemyPosition};
+use crate::player::PlayerId;
+use crate::player::api::AddKillsToAristeia;
 use crate::player::protocol::{
-    PlayerAimDirection, PlayerBundle, PlayerHealth, PlayerPosition, PlayerVisual,
+    PlayerAimDirection, PlayerAristeia, PlayerBundle, PlayerHealth, PlayerPosition, PlayerVisual,
 };
 use crate::player::shared::player_movement;
 use crate::protocol::inputs::PlayerAction;
@@ -61,8 +63,10 @@ impl Plugin for PlayerServerPlugin {
             (
                 player_movement,
                 update_player_aim_direction,
+                add_requested_aristeia,
                 apply_enemy_contact_damage,
-                control_dedicated_server_camera
+                control_dedicated_server_camera,
+                tick_player_aristeia
             )
                 .chain()
                 .in_set(FixedGameplaySet::Player)
@@ -73,6 +77,60 @@ impl Plugin for PlayerServerPlugin {
             FixedUpdate,
             debug_switch_rooms.run_if(in_state(ServerState::Hosting)),
         );
+    }
+}
+
+pub(crate) fn add_requested_aristeia(
+    settings: Res<GameSettings>,
+    mut requests: MessageReader<AddKillsToAristeia>,
+    mut players: Query<(&PlayerId, &mut PlayerAristeia)>,
+) {
+    for AddKillsToAristeia(owner_id, number_of_kills) in requests.read() {
+        let Some(mut aristeia) = players
+            .iter_mut()
+            .find_map(|(player_id, aristeia)| {
+                (player_id.0 == *owner_id).then_some(aristeia)
+            })
+        else {
+            warn!(
+                ?owner_id,
+                number_of_kills,
+                "No player matched the Aristeia award"
+            );
+            continue;
+        };
+
+        aristeia.current = aristeia
+            .current
+            .saturating_add(u32::from(*number_of_kills));
+
+        aristeia.maximum_ticks =
+            settings.player.aristeia_duration_ticks;
+
+        aristeia.remaining_ticks =
+            settings.player.aristeia_duration_ticks;
+    }
+}
+
+fn tick_player_aristeia(
+    mut players: Query<&mut PlayerAristeia>,
+) {
+    for mut aristeia in &mut players {
+        if aristeia.current == 0 {
+            aristeia.remaining_ticks = 0;
+            continue;
+        }
+
+        if aristeia.remaining_ticks > 0 {
+            aristeia.remaining_ticks -= 1;
+            continue;
+        }
+
+        aristeia.current = aristeia.current.saturating_sub(1);
+
+        if aristeia.current > 0 {
+            aristeia.remaining_ticks = aristeia.maximum_ticks;
+        }
     }
 }
 
@@ -96,7 +154,11 @@ pub(crate) fn handle_connected(
     let entity = commands
         .spawn((
             Name::new(format!("Player: {}", client_id)),
-            PlayerBundle::new(client_id, spawn_position),
+            PlayerBundle::new(
+                client_id,
+                spawn_position,
+                settings.player.aristeia_duration_ticks,
+            ),
             PlayerVisual,
             EnemyContactDamageCooldown::default(),
             ActionState::<PlayerAction>::default(),
