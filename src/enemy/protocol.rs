@@ -13,6 +13,7 @@ impl Plugin for EnemyProtocolPlugin {
             .add_linear_interpolation();
 
         app.component::<EnemyHealth>().replicate();
+        app.component::<EnemyKind>().replicate();
     }
 }
 
@@ -40,4 +41,10 @@ impl EnemyHealth {
             maximum,
         }
     }
+}
+
+#[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EnemyKind {
+    Regular,
+    GrandChampion,
 }

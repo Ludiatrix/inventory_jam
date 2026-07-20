@@ -1,5 +1,5 @@
 use crate::app::game_is_active;
-use crate::enemy::protocol::{EnemyHealth, EnemyPosition};
+use crate::enemy::protocol::{EnemyHealth, EnemyKind, EnemyPosition};
 use crate::settings::GameSettings;
 use bevy::prelude::*;
 
@@ -43,18 +43,22 @@ fn load_enemy_visual_assets(
 fn ensure_enemy_sprites(
     mut commands: Commands,
     assets: Res<EnemyVisualAssets>,
-    enemies: Query<Entity, (With<EnemyPosition>, Without<Sprite>)>,
+    enemies: Query<(Entity, &EnemyKind), (With<EnemyPosition>, Without<Sprite>)>,
 ) {
-    for entity in &enemies {
+    for (entity, kind) in &enemies {
+        let (index, scale) = match kind {
+            EnemyKind::Regular => (3, 2.25),
+            EnemyKind::GrandChampion => (4, 5.0),
+        };
         commands.entity(entity).insert((
             Sprite::from_atlas_image(
                 assets.image.clone(),
                 TextureAtlas {
                     layout: assets.layout.clone(),
-                    index: 3,
+                    index,
                 },
             ),
-            Transform::from_scale(Vec3::splat(2.25)),
+            Transform::from_scale(Vec3::splat(scale)),
         ));
     }
 }
