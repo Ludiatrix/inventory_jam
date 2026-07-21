@@ -1,8 +1,8 @@
 //! Main menu UI: username entry and connection actions.
 
-use crate::app::{ClientState, LaunchMode, LocalUsername, MAX_USERNAME_LEN, StartGame};
 #[cfg(feature = "server")]
 use crate::app::ServerState;
+use crate::app::{ClientState, LaunchMode, LocalUsername, MAX_USERNAME_LEN, StartGame};
 use crate::networking::ConnectionStatus;
 use crate::settings::GameSettings;
 use bevy::color::palettes::tailwind::{SLATE_300, SLATE_700, SLATE_900};
@@ -10,7 +10,6 @@ use bevy::input_focus::AutoFocus;
 use bevy::input_focus::tab_navigation::{TabGroup, TabIndex, TabNavigationPlugin};
 use bevy::prelude::*;
 use bevy::text::{EditableText, TextCursorStyle};
-
 
 #[derive(Component)]
 struct MenuRoot;
@@ -44,7 +43,9 @@ impl Plugin for MenuPlugin {
         app.add_systems(
             Update,
             (style_menu_buttons, handle_menu_buttons, sync_status_text)
-                .run_if(in_state(ClientState::Disconnected).or_else(in_state(ClientState::Connecting)))
+                .run_if(
+                    in_state(ClientState::Disconnected).or_else(in_state(ClientState::Connecting)),
+                )
                 .run_if(not_hosting),
         );
     }

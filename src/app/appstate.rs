@@ -26,16 +26,12 @@ pub(crate) fn game_is_active(
 }
 
 #[cfg(all(feature = "client", not(feature = "server")))]
-pub(crate) fn game_is_active(
-    client_state: Res<State<ClientState>>,
-) -> bool {
+pub(crate) fn game_is_active(client_state: Res<State<ClientState>>) -> bool {
     matches!(client_state.get(), ClientState::Playing)
 }
 
 #[cfg(all(feature = "server", not(feature = "client")))]
-pub(crate) fn game_is_active(
-    server_state: Res<State<ServerState>>,
-) -> bool {
+pub(crate) fn game_is_active(server_state: Res<State<ServerState>>) -> bool {
     matches!(server_state.get(), ServerState::Hosting)
 }
 

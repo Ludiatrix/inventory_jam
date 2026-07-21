@@ -3,7 +3,6 @@ use bevy::prelude::*;
 use lightyear::prelude::*;
 use serde::{Deserialize, Serialize};
 
-
 pub struct EnemyProtocolPlugin;
 
 impl Plugin for EnemyProtocolPlugin {

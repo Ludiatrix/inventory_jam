@@ -1,4 +1,3 @@
-
 use crate::app::ServerState;
 use crate::fragment::api::SpawnFragmentPool;
 use crate::fragment::{
@@ -9,8 +8,8 @@ use crate::persistence::{PersistenceReady, Transaction};
 use crate::player::{PlayerId, PlayerPosition, PlayerUsername};
 use crate::protocol::inputs::PlayerAction;
 use crate::protocol::rooms::GameRoom;
-use crate::shared::FixedGameplaySet;
 use crate::settings::GameSettings;
+use crate::shared::FixedGameplaySet;
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 use lightyear::prelude::*;
@@ -18,7 +17,6 @@ use rand::Rng;
 
 const MIN_FRAGMENTS_PER_DEBUG_POOL: u16 = 50;
 const MAX_FRAGMENTS_PER_DEBUG_POOL: u16 = 150;
-
 
 /// Installs only server-authoritative fragment behavior.
 pub struct FragmentServerPlugin;
@@ -264,10 +262,6 @@ fn random_position_in_annulus(
     center + direction * radius
 }
 
-fn fragment_is_outside_world(
-    position: Vec2,
-    room: &GameRoom,
-    settings: &GameSettings,
-) -> bool {
+fn fragment_is_outside_world(position: Vec2, room: &GameRoom, settings: &GameSettings) -> bool {
     !room.bounds(&settings.world).contains(position)
 }

@@ -70,11 +70,7 @@ pub(crate) struct PlayerBundle {
 
 #[cfg(feature = "server")]
 impl PlayerBundle {
-    pub(crate) fn new(
-        id: PeerId,
-        position: Vec2,
-        aristeia_duration_ticks: u16,
-    ) -> Self {
+    pub(crate) fn new(id: PeerId, position: Vec2, aristeia_duration_ticks: u16) -> Self {
         let h = (((id.to_bits().wrapping_mul(30)) % 360) as f32) / 360.0;
         let color = Color::hsl(h, 0.8, 0.5);
 
@@ -139,15 +135,7 @@ impl PlayerHealth {
 }
 
 // Used for Killstreak Tracking
-#[derive(
-    Component,
-    Serialize,
-    Deserialize,
-    Clone,
-    Copy,
-    Debug,
-    PartialEq,
-)]
+#[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub(crate) struct PlayerAristeia {
     /// Current Aristeia kill count or multiplier level.
     pub current: u32,
@@ -168,13 +156,13 @@ impl PlayerAristeia {
         }
     }
 
+    #[allow(unused)]
     pub fn remaining_fraction(&self) -> f32 {
         if self.maximum_ticks == 0 {
             return 0.0;
         }
 
-        (self.remaining_ticks as f32 / self.maximum_ticks as f32)
-            .clamp(0.0, 1.0)
+        (self.remaining_ticks as f32 / self.maximum_ticks as f32).clamp(0.0, 1.0)
     }
 }
 

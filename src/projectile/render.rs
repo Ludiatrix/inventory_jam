@@ -343,10 +343,7 @@ fn animate_weapon_effect_sprites(
     }
 }
 
-fn projectile_assets(
-    kind: WeaponKind,
-    assets: &ProjectileVisualAssets,
-) -> &AnimatedVisualAsset {
+fn projectile_assets(kind: WeaponKind, assets: &ProjectileVisualAssets) -> &AnimatedVisualAsset {
     match kind {
         WeaponKind::Sword => &assets.sword_projectile,
         WeaponKind::Spear => &assets.spear_projectile,

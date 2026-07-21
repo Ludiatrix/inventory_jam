@@ -1,7 +1,6 @@
 use crate::app::{ClientState, LocalUsername};
 use crate::player::protocol::{
-    LocalAimInput, PlayerAimDirection, PlayerColor, PlayerId, PlayerVisual,
-    SmoothedAimDirection,
+    LocalAimInput, PlayerAimDirection, PlayerColor, PlayerId, PlayerVisual, SmoothedAimDirection,
 };
 use crate::player::shared::player_movement;
 use crate::protocol::channels::ClientEventsChannel;
@@ -10,8 +9,7 @@ use crate::protocol::messages::{DebugServerMessage, SetUsername};
 use bevy::app::{App, FixedPreUpdate, FixedUpdate, Plugin, Update};
 use bevy::color::{Color, Hsva};
 use bevy::prelude::{
-    Add, Commands, IntoScheduleConfigs, Name, On, Query, Res, Single, Vec2, With, Without,
-    in_state,
+    Add, Commands, IntoScheduleConfigs, Name, On, Query, Res, Single, Vec2, With, Without, in_state,
 };
 use leafwing_input_manager::action_state::ActionState;
 use leafwing_input_manager::input_map::InputMap;
@@ -40,7 +38,10 @@ impl Plugin for PlayerClientPlugin {
                 .run_if(in_state(ClientState::Playing)),
         );
 
-        app.add_systems(Update, receive_message1.run_if(in_state(ClientState::Playing)));
+        app.add_systems(
+            Update,
+            receive_message1.run_if(in_state(ClientState::Playing)),
+        );
 
         app.add_observer(handle_predicted_spawn);
         app.add_observer(handle_controlled_spawn);

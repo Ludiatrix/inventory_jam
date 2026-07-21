@@ -20,7 +20,11 @@ impl Plugin for FragmentRenderPlugin {
         );
         app.add_systems(
             Update,
-            (ensure_fragment_sprites, sync_fragment_sprites, animate_fragment_sprites)
+            (
+                ensure_fragment_sprites,
+                sync_fragment_sprites,
+                animate_fragment_sprites,
+            )
                 .chain()
                 .run_if(game_is_active),
         );
@@ -92,8 +96,12 @@ fn animate_fragment_sprites(
 ) {
     for (mut animation, mut sprite) in &mut fragments {
         animation.0.tick(time.delta());
-        if !animation.0.just_finished() { continue; }
-        let Some(atlas) = sprite.texture_atlas.as_mut() else { continue; };
+        if !animation.0.just_finished() {
+            continue;
+        }
+        let Some(atlas) = sprite.texture_atlas.as_mut() else {
+            continue;
+        };
         atlas.index = (atlas.index + 1) % 8;
     }
 }
@@ -116,7 +124,11 @@ pub(crate) fn update_fragment_balance(
     player: Query<&CachedPersistentState, With<Controlled>>,
     mut text: Query<&mut Text, With<FragmentBalanceText>>,
 ) {
-    let Ok(state) = player.single() else { return; };
-    let Ok(mut text) = text.single_mut() else { return; };
+    let Ok(state) = player.single() else {
+        return;
+    };
+    let Ok(mut text) = text.single_mut() else {
+        return;
+    };
     text.0 = format!("Fragments: {}", state.fragment_count);
 }

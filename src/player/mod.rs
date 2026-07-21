@@ -16,13 +16,7 @@ pub mod api;
 
 use bevy::app::{App, Plugin};
 
-pub use protocol::{
-    PlayerAimDirection,
-    PlayerColor,
-    PlayerId,
-    PlayerPosition,
-    PlayerUsername,
-};
+pub use protocol::{PlayerAimDirection, PlayerColor, PlayerId, PlayerPosition, PlayerUsername};
 
 pub struct PlayerPlugin;
 

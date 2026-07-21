@@ -8,12 +8,13 @@ mod projectile;
 mod protocol;
 #[cfg(feature = "server")]
 mod server;
+mod settings;
 mod shared;
 mod ui;
 mod weapon;
 mod world;
-mod settings;
 
+use crate::settings::{GameSettings, GameSettingsLoadError};
 use app::*;
 use bevy::log::{Level, LogPlugin};
 use bevy::prelude::*;
@@ -32,7 +33,6 @@ use shared::SharedPlugin;
 use std::{process::ExitCode, time::Duration};
 use weapon::WeaponPlugin;
 use world::WorldPlugin;
-use crate::settings::{GameSettings, GameSettingsLoadError};
 
 use crate::ui::UiPlugin;
 
@@ -89,7 +89,7 @@ fn run() -> Result<(), GameSettingsLoadError> {
         FragmentPlugin,
         PersistencePlugin,
     ));
-    
+
     networking::configure_networking(&mut app);
 
     #[cfg(feature = "server")]

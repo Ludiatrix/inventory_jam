@@ -34,7 +34,9 @@ struct TileKey {
 struct WorldTileAssets {
     arena_image: Handle<Image>,
     arena_layout: Handle<TextureAtlasLayout>,
+    #[allow(unused)]
     safezone_image: Handle<Image>,
+    #[allow(unused)]
     safezone_layout: Handle<TextureAtlasLayout>,
 }
 
@@ -97,8 +99,12 @@ fn stream_world_tiles(
 
     let mut desired = HashSet::new();
 
-    for y in (camera_tile.y - settings.world.stream_half_height)..=(camera_tile.y + settings.world.stream_half_height) {
-        for x in (camera_tile.x - settings.world.stream_half_width)..=(camera_tile.x + settings.world.stream_half_width) {
+    for y in (camera_tile.y - settings.world.stream_half_height)
+        ..=(camera_tile.y + settings.world.stream_half_height)
+    {
+        for x in (camera_tile.x - settings.world.stream_half_width)
+            ..=(camera_tile.x + settings.world.stream_half_width)
+        {
             let world_position = Vec2::new(
                 (x as f32 + 0.5) * settings.world.tile_pixel_size,
                 (y as f32 + 0.5) * settings.world.tile_pixel_size,
@@ -188,8 +194,7 @@ fn spawn_world_tile(
 fn arena_floor_index(x: i32, y: i32, arena_floor_tiles: &[usize]) -> usize {
     // Deterministic integer hash: visually varied, stable between frames and
     // clients, and avoids obvious row/column striping.
-    let mut value = (x as u32).wrapping_mul(0x9E37_79B9)
-        ^ (y as u32).wrapping_mul(0x85EB_CA6B);
+    let mut value = (x as u32).wrapping_mul(0x9E37_79B9) ^ (y as u32).wrapping_mul(0x85EB_CA6B);
     value ^= value >> 16;
     value = value.wrapping_mul(0x7FEB_352D);
     value ^= value >> 15;
@@ -208,7 +213,10 @@ fn room_for_position(position: Vec2, settings: &GameSettings) -> Option<TileRoom
 }
 
 fn draw_world_boundaries(settings: Res<GameSettings>, mut gizmos: Gizmos) {
-    for bounds in [settings.world.arena_bounds(), settings.world.safezone_bounds()] {
+    for bounds in [
+        settings.world.arena_bounds(),
+        settings.world.safezone_bounds(),
+    ] {
         gizmos.rect_2d(
             Isometry2d::from_translation(bounds.center()),
             bounds.size(),

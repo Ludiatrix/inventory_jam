@@ -68,6 +68,7 @@ pub struct PlayerSettings {
     pub half_size: f32,
     pub collision_radius: f32,
     pub move_speed: f32,
+    #[allow(unused)]
     pub held_weapon_offset: f32,
     pub aristeia_duration_ticks: u16,
     pub aristeia_bar_width: f32,
@@ -84,6 +85,7 @@ pub struct WorldSettings {
     pub stream_half_width: i32,
     pub stream_half_height: i32,
     pub arena_floor_tiles: Vec<usize>,
+    #[allow(unused)]
     pub world_radius: f32,
 }
 
@@ -128,7 +130,6 @@ pub struct ProjectileSettings {
     pub spawn_gap: f32,
 }
 
-
 #[derive(Debug, Clone, Deserialize)]
 pub struct GlobalAristeiaSettings {
     pub threshold: u32,
@@ -156,20 +157,17 @@ pub struct MenuSettings {
 impl GameSettings {
     pub fn load(path: impl AsRef<Path>) -> Result<Self, GameSettingsLoadError> {
         let path = path.as_ref();
-        let json = fs::read_to_string(path).map_err(|source| {
-            GameSettingsLoadError::Read {
+        let json = fs::read_to_string(path).map_err(|source| GameSettingsLoadError::Read {
+            path: path.to_path_buf(),
+            source,
+        })?;
+
+        let settings = serde_json::from_str::<GameSettings>(&json).map_err(|source| {
+            GameSettingsLoadError::Parse {
                 path: path.to_path_buf(),
                 source,
             }
         })?;
-
-        let settings =
-            serde_json::from_str::<GameSettings>(&json).map_err(|source| {
-                GameSettingsLoadError::Parse {
-                    path: path.to_path_buf(),
-                    source,
-                }
-            })?;
 
         settings.validate()?;
         Ok(settings)

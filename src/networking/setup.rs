@@ -27,9 +27,9 @@ use super::shared::SERVER_ADDR;
 #[cfg(feature = "server")]
 use super::shared::SERVER_PORT;
 use super::shared::SHARED_SETTINGS;
-use crate::app::{ServerState, LaunchMode, StartGame};
 #[cfg(feature = "client")]
 use crate::app::{ClientState, LocalUsername, client_id_from_username, machine_local_username};
+use crate::app::{LaunchMode, ServerState, StartGame};
 
 #[cfg(feature = "client")]
 const CERT_DIGEST: &str = "18b16f92178824528aabb1c4274a0f247d0dec2c6f755e152739ff2fe343ec7c";

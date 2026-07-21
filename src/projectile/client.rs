@@ -1,9 +1,7 @@
 use bevy::prelude::*;
 
 use crate::{
-    app::ClientState,
-    projectile::shared::simulate_predicted_projectiles,
-    shared::FixedGameplaySet,
+    app::ClientState, projectile::shared::simulate_predicted_projectiles, shared::FixedGameplaySet,
 };
 
 pub struct ProjectileClientPlugin;

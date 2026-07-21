@@ -10,10 +10,16 @@ pub(crate) struct SpawnEnemy {
 
 impl SpawnEnemy {
     pub const fn regular(position: Vec2) -> Self {
-        Self { position, kind: EnemyKind::Regular }
+        Self {
+            position,
+            kind: EnemyKind::Regular,
+        }
     }
 
     pub const fn grand_champion(position: Vec2) -> Self {
-        Self { position, kind: EnemyKind::GrandChampion }
+        Self {
+            position,
+            kind: EnemyKind::GrandChampion,
+        }
     }
 }

@@ -6,11 +6,17 @@ use lightyear::{
     prelude::{InterpolationTarget, PreSpawned, PredictionTarget, Replicate},
 };
 
-use crate::{
-    enemy::{EnemyHealth, EnemyPosition}, fragment::api::SpawnFragmentPool, player::api::AddKillsToAristeia, player::{PlayerId, PlayerPosition}, projectile::protocol::{PlayerProjectile, ProjectileImpact, ProjectilePosition}, protocol::rooms::GameRoom, settings::GameSettings,
-};
 use crate::player::protocol::{PlayerAristeia, PlayerHealth};
 use crate::world::api::AddGlobalAristeia;
+use crate::{
+    enemy::{EnemyHealth, EnemyPosition},
+    fragment::api::SpawnFragmentPool,
+    player::api::AddKillsToAristeia,
+    player::{PlayerId, PlayerPosition},
+    projectile::protocol::{PlayerProjectile, ProjectileImpact, ProjectilePosition},
+    protocol::rooms::GameRoom,
+    settings::GameSettings,
+};
 
 pub struct SpawnProjectile {
     pub projectile: PlayerProjectile,
@@ -50,14 +56,12 @@ pub struct ImpactLifetime {
     pub remaining_ticks: u16,
 }
 
-
 pub fn projectile_spawn_position(
     player_position: Vec2,
     direction: Vec2,
     projectile_radius: f32,
     settings: &GameSettings,
 ) -> Vec2 {
-
     player_position
         + direction.normalize_or_zero()
             * (settings.player.half_size
@@ -125,7 +129,8 @@ pub fn simulate_server_projectiles(
                 &settings,
             );
             if enemy_died {
-                let personal_aristeia = players.iter()
+                let personal_aristeia = players
+                    .iter()
                     .find(|(_, player_id, _, _, _, _)| player_id.0 == projectile.owner)
                     .map(|(_, _, _, _, _, aristeia)| aristeia.current)
                     .unwrap_or(0);
@@ -133,12 +138,15 @@ pub fn simulate_server_projectiles(
                     .saturating_mul(personal_aristeia);
                 let drop_count = u32::from(settings.fragment.base_drop_count)
                     .saturating_add(bonus)
-                    .min(u32::from(settings.fragment.maximum_drop_count)) as u16;
+                    .min(u32::from(settings.fragment.maximum_drop_count))
+                    as u16;
 
                 fragment_drops.write(SpawnFragmentPool::new(position.0, drop_count, *room));
                 commands.entity(enemy_entity).despawn();
                 aristeia_tracking.write(AddKillsToAristeia::new(projectile.owner, 1));
-                global_aristeia.write(AddGlobalAristeia(settings.global_aristeia.contribution_per_kill));
+                global_aristeia.write(AddGlobalAristeia(
+                    settings.global_aristeia.contribution_per_kill,
+                ));
             }
             continue;
         }
@@ -243,16 +251,14 @@ fn get_hit_player(
     settings: &GameSettings,
 ) -> Option<Entity> {
     for (player_entity, player_id, player_position, player_room, mut health, _) in players {
-        if player_id.0 == projectile.owner
-            || player_room != projectile_room
-            || health.current == 0
+        if player_id.0 == projectile.owner || player_room != projectile_room || health.current == 0
         {
             continue;
         }
 
         let collision_radius = projectile.radius + settings.player.collision_radius;
-        let hit = position.0.distance_squared(player_position.0)
-            <= collision_radius * collision_radius;
+        let hit =
+            position.0.distance_squared(player_position.0) <= collision_radius * collision_radius;
 
         if !hit {
             continue;
@@ -286,8 +292,8 @@ fn get_hit_enemy(
         }
 
         let collision_radius = projectile.radius + settings.enemy.collision_radius;
-        let hit = position.0.distance_squared(enemy_position.0)
-            <= collision_radius * collision_radius;
+        let hit =
+            position.0.distance_squared(enemy_position.0) <= collision_radius * collision_radius;
 
         if !hit {
             continue;
@@ -313,10 +319,6 @@ pub fn expire_server_impacts(
     }
 }
 
-fn projectile_is_outside_world(
-    position: Vec2,
-    room: &GameRoom,
-    settings: &GameSettings,
-) -> bool {
+fn projectile_is_outside_world(position: Vec2, room: &GameRoom, settings: &GameSettings) -> bool {
     !room.bounds(&settings.world).contains(position)
 }

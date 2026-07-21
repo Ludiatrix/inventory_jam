@@ -8,8 +8,8 @@ use crate::player::protocol::{
 use crate::player::shared::player_movement;
 use crate::protocol::inputs::PlayerAction;
 use crate::protocol::rooms::{GameRoom, GameRooms};
-use crate::shared::FixedGameplaySet;
 use crate::settings::GameSettings;
+use crate::shared::FixedGameplaySet;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use leafwing_input_manager::prelude::*;
@@ -17,7 +17,6 @@ use lightyear::connection::client::Connected;
 use lightyear::connection::client_of::ClientOf;
 use lightyear::prelude::*;
 use rand::Rng;
-
 
 #[derive(Component, Clone, Copy, Debug, Default)]
 struct EnemyContactDamageCooldown {
@@ -38,6 +37,7 @@ pub enum PlayerSpawnMode {
         minimum_radius: f32,
         maximum_radius: f32,
     },
+    #[allow(unused)]
     Fixed(Vec2),
 }
 
@@ -66,7 +66,7 @@ impl Plugin for PlayerServerPlugin {
                 add_requested_aristeia,
                 apply_enemy_contact_damage,
                 control_dedicated_server_camera,
-                tick_player_aristeia
+                tick_player_aristeia,
             )
                 .chain()
                 .in_set(FixedGameplaySet::Player)
@@ -88,33 +88,24 @@ pub(crate) fn add_requested_aristeia(
     for AddKillsToAristeia(owner_id, number_of_kills) in requests.read() {
         let Some(mut aristeia) = players
             .iter_mut()
-            .find_map(|(player_id, aristeia)| {
-                (player_id.0 == *owner_id).then_some(aristeia)
-            })
+            .find_map(|(player_id, aristeia)| (player_id.0 == *owner_id).then_some(aristeia))
         else {
             warn!(
                 ?owner_id,
-                number_of_kills,
-                "No player matched the Aristeia award"
+                number_of_kills, "No player matched the Aristeia award"
             );
             continue;
         };
 
-        aristeia.current = aristeia
-            .current
-            .saturating_add(u32::from(*number_of_kills));
+        aristeia.current = aristeia.current.saturating_add(u32::from(*number_of_kills));
 
-        aristeia.maximum_ticks =
-            settings.player.aristeia_duration_ticks;
+        aristeia.maximum_ticks = settings.player.aristeia_duration_ticks;
 
-        aristeia.remaining_ticks =
-            settings.player.aristeia_duration_ticks;
+        aristeia.remaining_ticks = settings.player.aristeia_duration_ticks;
     }
 }
 
-fn tick_player_aristeia(
-    mut players: Query<&mut PlayerAristeia>,
-) {
+fn tick_player_aristeia(mut players: Query<&mut PlayerAristeia>) {
     for mut aristeia in &mut players {
         if aristeia.current == 0 {
             aristeia.remaining_ticks = 0;
@@ -172,14 +163,15 @@ pub(crate) fn handle_connected(
         ))
         .id();
 
-    info!(?entity, ?client_id, ?spawn_position, "Created player entity");
+    info!(
+        ?entity,
+        ?client_id,
+        ?spawn_position,
+        "Created player entity"
+    );
 }
 
-fn choose_player_spawn(
-    mode: PlayerSpawnMode,
-    room: GameRoom,
-    settings: &GameSettings,
-) -> Vec2 {
+fn choose_player_spawn(mode: PlayerSpawnMode, room: GameRoom, settings: &GameSettings) -> Vec2 {
     let bounds = room
         .bounds(&settings.world)
         .inflate(-settings.player.half_size);
@@ -242,12 +234,9 @@ fn apply_enemy_contact_damage(
     settings: Res<GameSettings>,
 ) {
     for (player_entity, player_position, room, mut health, mut cooldown) in &mut players {
-        cooldown.remaining_seconds =
-            (cooldown.remaining_seconds - time.delta_secs()).max(0.0);
+        cooldown.remaining_seconds = (cooldown.remaining_seconds - time.delta_secs()).max(0.0);
 
-        if room.room != GameRooms::Arena
-            || health.current == 0
-            || cooldown.remaining_seconds > 0.0
+        if room.room != GameRooms::Arena || health.current == 0 || cooldown.remaining_seconds > 0.0
         {
             continue;
         }
@@ -257,7 +246,8 @@ fn apply_enemy_contact_damage(
                 return false;
             }
 
-            let collision_radius = settings.player.collision_radius + settings.enemy.collision_radius;
+            let collision_radius =
+                settings.player.collision_radius + settings.enemy.collision_radius;
             player_position.0.distance_squared(enemy_position.0)
                 <= collision_radius * collision_radius
         });
@@ -298,7 +288,7 @@ fn control_dedicated_server_camera(
     keyboard: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     window: Single<&Window, With<PrimaryWindow>>,
-    mut camera: Single<(&mut Transform, &mut Projection), With<Camera2d>>,
+    camera: Single<(&mut Transform, &mut Projection), With<Camera2d>>,
     settings: Res<GameSettings>,
 ) {
     let (mut camera_transform, mut projection) = camera.into_inner();
@@ -317,11 +307,12 @@ fn control_dedicated_server_camera(
     };
 
     if zoom_axis != 0.0 {
-        orthographic.scale = (orthographic.scale * (settings.server_camera.zoom_speed * zoom_axis * dt).exp())
-            .clamp(
-                settings.server_camera.min_scale,
-                settings.server_camera.max_scale,
-            );
+        orthographic.scale = (orthographic.scale
+            * (settings.server_camera.zoom_speed * zoom_axis * dt).exp())
+        .clamp(
+            settings.server_camera.min_scale,
+            settings.server_camera.max_scale,
+        );
     }
 
     if keyboard.just_pressed(KeyCode::Digit0) {
@@ -350,11 +341,11 @@ fn control_dedicated_server_camera(
     let direction = Vec2::new(horizontal, vertical).normalize_or_zero();
     if direction != Vec2::ZERO {
         let visible_world_height = window.height() * orthographic.scale;
-        camera_transform.translation +=
-            (direction
-                * visible_world_height
-                * settings.server_camera.pan_speed_in_screen_heights
-                * dt).extend(0.0);
+        camera_transform.translation += (direction
+            * visible_world_height
+            * settings.server_camera.pan_speed_in_screen_heights
+            * dt)
+            .extend(0.0);
     }
 }
 
@@ -396,8 +387,12 @@ fn axis(
     positive_pressed as i8 as f32 - negative_pressed as i8 as f32
 }
 
+#[allow(unused)]
 fn draw_world_boundaries(settings: Res<GameSettings>, mut gizmos: Gizmos) {
-    for bounds in [settings.world.arena_bounds(), settings.world.safezone_bounds()] {
+    for bounds in [
+        settings.world.arena_bounds(),
+        settings.world.safezone_bounds(),
+    ] {
         gizmos.rect_2d(
             Isometry2d::from_translation(bounds.center()),
             bounds.size(),
