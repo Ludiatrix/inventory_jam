@@ -26,7 +26,7 @@ use systems::{
 use worker::spawn_worker;
 
 #[cfg(feature = "server")]
-const DATABASE_SERVER_URL_PATH: &str = "secrets/database-server-url.txt";
+const DATABASE_SERVER_URL_PATH: &str = "public/database-server-url.txt";
 
 #[cfg(feature = "server")]
 fn read_database_url() -> Result<String, String> {

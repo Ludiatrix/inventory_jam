@@ -32,9 +32,8 @@ check-features:
     cargo clippy --no-default-features --all-targets --features "netcode,udp,webtransport,server"
     cargo clippy --no-default-features --all-targets --features "netcode,udp,webtransport,client,server,gui"
 
-# Build a release binary without the `dev` feature.
-# `dev` (in the default feature set) enables bevy/dynamic_linking,
-# which breaks the release linker on windows-gnu
-# (MinGW ld can't export that many symbols from bevy_dylib).
+# Build a distributable zip (binary + assets + public/database-server-url.txt)
+# for the current platform. Feature selection (excluding `dev`, which breaks
+# the windows-gnu linker) lives in Cargo.toml's [package.metadata.dist].
 release:
-    cargo build --release --no-default-features --features "client,gui,server,netcode,udp,webtransport"
+    dist build
