@@ -16,6 +16,18 @@
             "problemMatcher": ["$rustc"]
         },
         {
+            "label": "just release",
+            "type": "cargo",
+            "command": "build",
+            "args": [
+                "--release",
+                "--no-default-features",
+                "--features",
+                "client,gui,server,netcode,udp,webtransport"
+            ],
+            "problemMatcher": ["$rustc"]
+        },
+        {
             "label": "Run Host",
             "type": "cargo",
             "command": "run",
