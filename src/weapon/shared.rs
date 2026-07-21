@@ -87,7 +87,7 @@ pub(crate) fn fire_equipped_weapons(
         &EquippedWeapon,
         &mut WeaponCooldown,
     )>,
-    app_state: Res<State<ServerState>>,
+    app_state: Option<Res<State<ServerState>>>,
     local_timeline: Res<LocalTimeline>,
     tick_duration: Res<TickDuration>,
     settings: Res<GameSettings>,
@@ -131,7 +131,9 @@ pub(crate) fn fire_equipped_weapons(
             },
             spawn_position,
             room: *room,
-            is_authoritative: matches!(app_state.get(), ServerState::Hosting),
+            is_authoritative: app_state
+                .as_ref()
+                .is_some_and(|state| matches!(state.get(), ServerState::Hosting)),
         });
 
         cooldown.restart(&local_timeline, &tick_duration, stats.attacks_per_second);

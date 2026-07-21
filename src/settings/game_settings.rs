@@ -1,7 +1,6 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+#[cfg(not(target_family = "wasm"))]
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use bevy::prelude::*;
 use serde::Deserialize;
@@ -157,6 +156,13 @@ pub struct MenuSettings {
 impl GameSettings {
     pub fn load(path: impl AsRef<Path>) -> Result<Self, GameSettingsLoadError> {
         let path = path.as_ref();
+
+        // wasm32-unknown-unknown has no filesystem, so the settings file is
+        // embedded into the binary at compile time instead of read at runtime.
+        #[cfg(target_family = "wasm")]
+        let json = include_str!("../../assets/game_settings.json").to_owned();
+
+        #[cfg(not(target_family = "wasm"))]
         let json = fs::read_to_string(path).map_err(|source| GameSettingsLoadError::Read {
             path: path.to_path_buf(),
             source,
