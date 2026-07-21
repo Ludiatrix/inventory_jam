@@ -24,6 +24,7 @@ check-features:
     cargo clippy --no-default-features --all-targets --features "netcode,udp,webtransport,client,gui"
     cargo clippy --no-default-features --all-targets --features "netcode,udp,webtransport,server"
     cargo clippy --no-default-features --all-targets --features "netcode,udp,webtransport,client,server,gui"
+    cargo clippy --target wasm32-unknown-unknown --no-default-features --features "client,gui,netcode,webtransport"
 
 # Check the project builds cleanly under every client/server/gui combo
 [windows]
@@ -31,6 +32,7 @@ check-features:
     cargo clippy --no-default-features --all-targets --features "netcode,udp,webtransport,client,gui"
     cargo clippy --no-default-features --all-targets --features "netcode,udp,webtransport,server"
     cargo clippy --no-default-features --all-targets --features "netcode,udp,webtransport,client,server,gui"
+    cargo clippy --target wasm32-unknown-unknown --no-default-features --features "client,gui,netcode,webtransport"
 
 # Build a distributable zip (binary + assets + public/database-server-url.txt)
 # for the current platform. Feature selection (excluding `dev`, which breaks

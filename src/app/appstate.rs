@@ -1,3 +1,4 @@
+#[cfg(not(target_family = "wasm"))]
 use super::args::parse_args;
 use bevy::prelude::*;
 
