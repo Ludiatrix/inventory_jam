@@ -4,6 +4,7 @@ mod fragment;
 mod networking;
 mod persistence;
 mod player;
+mod portal;
 mod projectile;
 mod protocol;
 #[cfg(feature = "server")]
@@ -12,6 +13,7 @@ mod settings;
 mod shared;
 mod ui;
 mod weapon;
+mod weapon_station;
 mod world;
 
 use crate::settings::{GameSettings, GameSettingsLoadError};
@@ -26,12 +28,14 @@ use enemy::EnemyPlugin;
 use fragment::FragmentPlugin;
 use persistence::PersistencePlugin;
 use player::PlayerPlugin;
+use portal::PortalPlugin;
 use projectile::ProjectilePlugin;
 #[cfg(feature = "server")]
 use server::ExampleServerPlugin;
 use shared::SharedPlugin;
 use std::{process::ExitCode, time::Duration};
 use weapon::WeaponPlugin;
+use weapon_station::WeaponStationPlugin;
 use world::WorldPlugin;
 
 use crate::ui::UiPlugin;
@@ -79,6 +83,8 @@ fn run() -> Result<(), GameSettingsLoadError> {
 
     app.add_plugins((
         WorldPlugin,
+        PortalPlugin,
+        WeaponStationPlugin,
         UiPlugin,
         LaunchPlugin,
         SharedPlugin,
@@ -122,6 +128,7 @@ fn base_app() -> App {
                         resolution: (1024, 768).into(),
                         present_mode: PresentMode::AutoVsync,
                         prevent_default_event_handling: true,
+                        fit_canvas_to_parent: true,
                         ..default()
                     }),
                     ..default()

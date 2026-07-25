@@ -1,8 +1,11 @@
+#[cfg(feature = "dev")]
+use crate::protocol::inputs::PlayerAction;
+use crate::protocol::rooms::GameRoom;
 #[cfg(feature = "server")]
 use crate::protocol::rooms::GameRooms;
-use crate::protocol::{inputs::PlayerAction, rooms::GameRoom};
 use bevy::math::Curve;
 use bevy::prelude::*;
+#[cfg(feature = "dev")]
 use leafwing_input_manager::action_state::ActionState;
 use lightyear::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -16,6 +19,7 @@ impl Plugin for PlayerProtocolPlugin {
     fn build(&self, app: &mut App) {
         app.component::<PlayerId>().replicate();
 
+        #[cfg(feature = "dev")]
         app.add_systems(PostUpdate, debug_player_position);
         app.component::<PlayerPosition>()
             .replicate()
@@ -36,6 +40,7 @@ impl Plugin for PlayerProtocolPlugin {
     }
 }
 
+#[cfg(feature = "dev")]
 #[allow(unused)]
 fn debug_player_position(
     q: Query<(Entity, &PlayerPosition, &ActionState<PlayerAction>)>,
@@ -66,11 +71,18 @@ pub(crate) struct PlayerBundle {
     username: PlayerUsername,
     health: PlayerHealth,
     aristeia: PlayerAristeia,
+    projectile_buffer: crate::projectile::protocol::ProjectileBuffer,
 }
 
 #[cfg(feature = "server")]
 impl PlayerBundle {
-    pub(crate) fn new(id: PeerId, position: Vec2, aristeia_duration_ticks: u16) -> Self {
+    pub(crate) fn new(
+        id: PeerId,
+        position: Vec2,
+        maximum_health: u32,
+        aristeia_duration_ticks: u16,
+        projectile_buffer_capacity: usize,
+    ) -> Self {
         let h = (((id.to_bits().wrapping_mul(30)) % 360) as f32) / 360.0;
         let color = Color::hsl(h, 0.8, 0.5);
 
@@ -80,11 +92,14 @@ impl PlayerBundle {
             color: PlayerColor(color),
             aim_direction: PlayerAimDirection::default(),
             game_room: GameRoom {
-                room: GameRooms::Arena,
+                room: GameRooms::Safezone,
             },
             username: PlayerUsername(temporary_username(id.to_bits())),
-            health: PlayerHealth::new(100),
+            health: PlayerHealth::new(maximum_health),
             aristeia: PlayerAristeia::new(aristeia_duration_ticks),
+            projectile_buffer: crate::projectile::protocol::ProjectileBuffer::new(
+                projectile_buffer_capacity,
+            ),
         }
     }
 }

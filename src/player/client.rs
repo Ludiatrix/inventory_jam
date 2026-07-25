@@ -1,24 +1,30 @@
 use crate::app::{ClientState, LocalUsername};
 use crate::player::protocol::{
-    LocalAimInput, PlayerAimDirection, PlayerColor, PlayerId, PlayerVisual, SmoothedAimDirection,
+    LocalAimInput, PlayerColor, PlayerId, PlayerVisual, SmoothedAimDirection,
 };
-use crate::player::shared::player_movement;
+use crate::player::shared::{predicted_player_aim, predicted_player_movement};
 use crate::protocol::channels::ClientEventsChannel;
 use crate::protocol::inputs::PlayerAction;
-use crate::protocol::messages::{DebugServerMessage, SetUsername};
-use bevy::app::{App, FixedPreUpdate, FixedUpdate, Plugin, Update};
+#[cfg(feature = "dev")]
+use crate::protocol::messages::DebugServerMessage;
+use crate::protocol::messages::SetUsername;
+#[cfg(feature = "dev")]
+use bevy::app::Update;
+use bevy::app::{App, FixedPreUpdate, FixedUpdate, Plugin};
 use bevy::color::{Color, Hsva};
+#[cfg(feature = "dev")]
+use bevy::prelude::Single;
 use bevy::prelude::{
-    Add, Commands, IntoScheduleConfigs, Name, On, Query, Res, Single, Vec2, With, Without, in_state,
+    Add, Commands, IntoScheduleConfigs, Name, On, Query, Res, Vec2, With, Without, in_state,
 };
 use leafwing_input_manager::action_state::ActionState;
 use leafwing_input_manager::input_map::InputMap;
 use lightyear::input::client::InputSystems;
 use lightyear::interpolation::Interpolated;
 use lightyear::prediction::Predicted;
-use lightyear::prelude::{
-    Client, Connected, Controlled, ControlledBy, MessageReceiver, MessageSender,
-};
+#[cfg(feature = "dev")]
+use lightyear::prelude::MessageReceiver;
+use lightyear::prelude::{Client, Connected, Controlled, ControlledBy, MessageSender};
 
 pub struct PlayerClientPlugin;
 
@@ -33,11 +39,13 @@ impl Plugin for PlayerClientPlugin {
         );
         app.add_systems(
             FixedUpdate,
-            (apply_local_aim_to_predicted_player, player_movement)
+            (predicted_player_aim, predicted_player_movement)
                 .chain()
+                .in_set(crate::shared::FixedGameplaySet::Player)
                 .run_if(in_state(ClientState::Playing)),
         );
 
+        #[cfg(feature = "dev")]
         app.add_systems(
             Update,
             receive_message1.run_if(in_state(ClientState::Playing)),
@@ -52,11 +60,16 @@ impl Plugin for PlayerClientPlugin {
 
 fn write_local_aim_to_leafwing(
     local_aim: Res<LocalAimInput>,
+    touch_controls: Option<Res<crate::ui::TouchControlsEnabled>>,
     mut input_entities: Query<
         &mut ActionState<PlayerAction>,
         (With<Controlled>, With<InputMap<PlayerAction>>),
     >,
 ) {
+    if touch_controls.is_some_and(|enabled| enabled.0) {
+        return;
+    }
+
     let direction = local_aim.0.normalize_or_zero();
 
     if direction == Vec2::ZERO {
@@ -68,21 +81,7 @@ fn write_local_aim_to_leafwing(
     }
 }
 
-fn apply_local_aim_to_predicted_player(
-    local_aim: Res<LocalAimInput>,
-    mut predicted_players: Query<&mut PlayerAimDirection, With<Predicted>>,
-) {
-    let direction = local_aim.0.normalize_or_zero();
-
-    if direction == Vec2::ZERO {
-        return;
-    }
-
-    for mut aim_direction in &mut predicted_players {
-        aim_direction.0 = direction;
-    }
-}
-
+#[cfg(feature = "dev")]
 fn receive_message1(mut receiver: Single<&mut MessageReceiver<DebugServerMessage>>) {
     for _message in receiver.receive() {
         //info!("Received message: {:?}", message);

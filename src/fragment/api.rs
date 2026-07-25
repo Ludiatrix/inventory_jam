@@ -9,15 +9,15 @@ use crate::protocol::rooms::GameRoom;
 #[derive(Message, Clone, Copy, Debug)]
 pub(crate) struct SpawnFragmentPool {
     pub center: Vec2,
-    pub count: u16,
+    pub total_value: u32,
     pub room: GameRoom,
 }
 
 impl SpawnFragmentPool {
-    pub const fn new(center: Vec2, count: u16, room: GameRoom) -> Self {
+    pub const fn new(center: Vec2, total_value: u32, room: GameRoom) -> Self {
         Self {
             center,
-            count,
+            total_value,
             room,
         }
     }

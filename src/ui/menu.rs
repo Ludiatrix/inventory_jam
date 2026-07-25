@@ -2,14 +2,26 @@
 
 #[cfg(feature = "server")]
 use crate::app::ServerState;
-use crate::app::{ClientState, LaunchMode, LocalUsername, MAX_USERNAME_LEN, StartGame};
+use crate::app::{ClientState, LaunchMode, LocalUsername, StartGame};
 use crate::networking::ConnectionStatus;
 use crate::settings::GameSettings;
-use bevy::color::palettes::tailwind::{SLATE_300, SLATE_700, SLATE_900};
-use bevy::input_focus::AutoFocus;
+use bevy::color::palettes::tailwind::SLATE_700;
 use bevy::input_focus::tab_navigation::{TabGroup, TabIndex, TabNavigationPlugin};
 use bevy::prelude::*;
+
+#[cfg(not(target_family = "wasm"))]
+use crate::app::MAX_USERNAME_LEN;
+#[cfg(not(target_family = "wasm"))]
+use bevy::color::palettes::tailwind::{SLATE_300, SLATE_900};
+#[cfg(not(target_family = "wasm"))]
+use bevy::input_focus::AutoFocus;
+#[cfg(not(target_family = "wasm"))]
 use bevy::text::{EditableText, TextCursorStyle};
+
+#[cfg(target_family = "wasm")]
+use crate::ui::browser_username::{
+    browser_username_value, mount_browser_username, unmount_browser_username,
+};
 
 #[derive(Component)]
 struct MenuRoot;
@@ -23,9 +35,9 @@ struct StatusText;
 #[derive(Component, Clone, Copy, Debug)]
 enum MenuButton {
     Join,
-    #[cfg(all(feature = "server", not(target_family = "wasm")))]
+    #[cfg(all(feature = "dev", feature = "server", not(target_family = "wasm")))]
     HostLocal,
-    #[cfg(all(feature = "client", not(target_family = "wasm")))]
+    #[cfg(all(feature = "dev", feature = "client", not(target_family = "wasm")))]
     JoinLocal,
 }
 
@@ -57,36 +69,10 @@ fn spawn_main_menu(
     username: Res<LocalUsername>,
     status: Res<ConnectionStatus>,
 ) {
-    let input = commands
-        .spawn((
-            UsernameInput,
-            AutoFocus,
-            TabIndex(0),
-            Node {
-                width: px(280),
-                height: px(40),
-                border: px(2).all(),
-                padding: px(8).all(),
-                justify_content: JustifyContent::FlexStart,
-                align_items: AlignItems::Center,
-                ..default()
-            },
-            BorderColor::all(Color::from(SLATE_300)),
-            BackgroundColor(Color::from(SLATE_900)),
-            EditableText {
-                visible_width: Some(18.),
-                allow_newlines: false,
-                max_characters: Some(MAX_USERNAME_LEN),
-                ..EditableText::new(&username.0)
-            },
-            TextLayout::no_wrap(),
-            TextFont {
-                font_size: FontSize::Px(22.0),
-                ..default()
-            },
-            TextCursorStyle::default(),
-        ))
-        .id();
+    #[cfg(target_family = "wasm")]
+    mount_browser_username(&username.0);
+
+    let input = spawn_username_field(&mut commands, &username);
 
     let mut children = vec![
         commands
@@ -111,7 +97,7 @@ fn spawn_main_menu(
         menu_button(&mut commands, &settings, MenuButton::Join, "Join", 1),
     ];
 
-    #[cfg(all(feature = "server", not(target_family = "wasm")))]
+    #[cfg(all(feature = "dev", feature = "server", not(target_family = "wasm")))]
     children.push(menu_button(
         &mut commands,
         &settings,
@@ -119,7 +105,7 @@ fn spawn_main_menu(
         "Host Local Server",
         2,
     ));
-    #[cfg(all(feature = "client", not(target_family = "wasm")))]
+    #[cfg(all(feature = "dev", feature = "client", not(target_family = "wasm")))]
     children.push(menu_button(
         &mut commands,
         &settings,
@@ -158,6 +144,57 @@ fn spawn_main_menu(
             BackgroundColor(Color::srgba(0.05, 0.06, 0.08, 0.92)),
         ))
         .add_children(&children);
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn spawn_username_field(commands: &mut Commands, username: &LocalUsername) -> Entity {
+    commands
+        .spawn((
+            UsernameInput,
+            AutoFocus,
+            TabIndex(0),
+            Node {
+                width: px(280),
+                height: px(40),
+                border: px(2).all(),
+                padding: px(8).all(),
+                justify_content: JustifyContent::FlexStart,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            BorderColor::all(Color::from(SLATE_300)),
+            BackgroundColor(Color::from(SLATE_900)),
+            EditableText {
+                visible_width: Some(18.),
+                allow_newlines: false,
+                max_characters: Some(MAX_USERNAME_LEN),
+                ..EditableText::new(&username.0)
+            },
+            TextLayout::no_wrap(),
+            TextFont {
+                font_size: FontSize::Px(22.0),
+                ..default()
+            },
+            TextCursorStyle::default(),
+        ))
+        .id()
+}
+
+#[cfg(target_family = "wasm")]
+fn spawn_username_field(commands: &mut Commands, _username: &LocalUsername) -> Entity {
+    // Spacer keeps Bevy layout aligned with the HTML input overlay above the canvas.
+    commands
+        .spawn((
+            UsernameInput,
+            TabIndex(0),
+            Node {
+                width: px(280),
+                height: px(40),
+                ..default()
+            },
+            BackgroundColor(Color::NONE),
+        ))
+        .id()
 }
 
 fn spawn_connecting_overlay(mut commands: Commands, status: Res<ConnectionStatus>) {
@@ -211,6 +248,9 @@ fn spawn_status_screen(commands: &mut Commands, title: &str, detail: &str) {
 }
 
 fn despawn_menu_ui(mut commands: Commands, roots: Query<Entity, With<MenuRoot>>) {
+    #[cfg(target_family = "wasm")]
+    unmount_browser_username();
+
     for entity in &roots {
         commands.entity(entity).despawn();
     }
@@ -295,7 +335,7 @@ fn sync_status_text(status: Res<ConnectionStatus>, mut texts: Query<&mut Text, W
 
 fn handle_menu_buttons(
     interactions: Query<(&Interaction, &MenuButton), Changed<Interaction>>,
-    inputs: Query<&EditableText, With<UsernameInput>>,
+    #[cfg(not(target_family = "wasm"))] inputs: Query<&EditableText, With<UsernameInput>>,
     mut username: ResMut<LocalUsername>,
     mut status: ResMut<ConnectionStatus>,
     mut starts: MessageWriter<StartGame>,
@@ -305,8 +345,14 @@ fn handle_menu_buttons(
             continue;
         }
 
+        #[cfg(not(target_family = "wasm"))]
         if let Ok(input) = inputs.single() {
             username.0 = input.value().to_string();
+        }
+
+        #[cfg(target_family = "wasm")]
+        {
+            username.0 = browser_username_value();
         }
 
         match button {
@@ -320,14 +366,14 @@ fn handle_menu_buttons(
                 }
                 Err(error) => status.message = error,
             },
-            #[cfg(all(feature = "server", not(target_family = "wasm")))]
+            #[cfg(all(feature = "dev", feature = "server", not(target_family = "wasm")))]
             MenuButton::HostLocal => {
                 starts.write(StartGame {
                     mode: LaunchMode::DedicatedServer,
                     username: String::new(),
                 });
             }
-            #[cfg(all(feature = "client", not(target_family = "wasm")))]
+            #[cfg(all(feature = "dev", feature = "client", not(target_family = "wasm")))]
             MenuButton::JoinLocal => match username.validated() {
                 Ok(name) => {
                     username.0.clone_from(&name);

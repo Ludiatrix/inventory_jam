@@ -6,33 +6,12 @@ pub struct WeaponProtocolPlugin;
 
 impl Plugin for WeaponProtocolPlugin {
     fn build(&self, app: &mut App) {
-        app.component::<EquippedWeapon>().replicate();
-        app.component::<WeaponCooldown>().replicate();
+        app.component::<WeaponCooldown>().replicate().predict();
     }
 }
 
 /// Stable gameplay identifier replicated over the network.
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum WeaponKind {
-    Sword,
-    Spear,
-    Staff,
-    Bow,
-    Shuriken,
-    Boomerang,
-}
-
-#[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct EquippedWeapon {
-    pub kind: WeaponKind,
-    pub level: u32,
-}
-
-impl EquippedWeapon {
-    pub const fn new(kind: WeaponKind, level: u32) -> Self {
-        Self { kind, level }
-    }
-}
+pub type WeaponId = u16;
 
 #[derive(
     Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Deref, DerefMut, Default,

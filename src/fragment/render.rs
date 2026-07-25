@@ -78,7 +78,7 @@ fn ensure_fragment_sprites(
                     index: 0,
                 },
             ),
-            Transform::from_scale(Vec3::splat(1.25)),
+            Transform::default(),
             FragmentAnimation(Timer::from_seconds(0.08, TimerMode::Repeating)),
         ));
     }
@@ -130,5 +130,8 @@ pub(crate) fn update_fragment_balance(
     let Ok(mut text) = text.single_mut() else {
         return;
     };
-    text.0 = format!("Fragments: {}", state.fragment_count);
+    text.0 = format!(
+        "Fragments: {}",
+        state.weapon(state.equipped_weapon_id).fragments
+    );
 }

@@ -1,11 +1,12 @@
 use crate::app::ServerState;
-use crate::enemy::{EnemyHealth, EnemyPosition};
+use crate::enemy::{EnemyHealth, EnemyKind, EnemyPosition};
 use crate::player::PlayerId;
 use crate::player::api::AddKillsToAristeia;
 use crate::player::protocol::{
     PlayerAimDirection, PlayerAristeia, PlayerBundle, PlayerHealth, PlayerPosition, PlayerVisual,
 };
-use crate::player::shared::player_movement;
+use crate::player::shared::{apply_player_aim, apply_player_movement};
+use crate::portal::PortalTeleportCooldown;
 use crate::protocol::inputs::PlayerAction;
 use crate::protocol::rooms::{GameRoom, GameRooms};
 use crate::settings::GameSettings;
@@ -16,66 +17,38 @@ use leafwing_input_manager::prelude::*;
 use lightyear::connection::client::Connected;
 use lightyear::connection::client_of::ClientOf;
 use lightyear::prelude::*;
-use rand::Rng;
 
 #[derive(Component, Clone, Copy, Debug, Default)]
 struct EnemyContactDamageCooldown {
     remaining_seconds: f32,
 }
 
-/// Controls where newly connected players appear.
-///
-/// `Annulus` chooses a random point between `minimum_radius` and
-/// `maximum_radius` from `center`. Set both radii to the same value to spawn at
-/// an exact distance from the center.
-///
-/// `Fixed` always uses the requested position, clamped inside the room bounds.
-#[derive(Resource, Clone, Copy, Debug)]
-pub enum PlayerSpawnMode {
-    Annulus {
-        center: Vec2,
-        minimum_radius: f32,
-        maximum_radius: f32,
-    },
-    #[allow(unused)]
-    Fixed(Vec2),
-}
-
-impl Default for PlayerSpawnMode {
-    fn default() -> Self {
-        Self::Annulus {
-            center: Vec2::ZERO,
-            minimum_radius: 350.0,
-            maximum_radius: 500.0,
-        }
-    }
+#[derive(Component, Clone, Copy, Debug, Default)]
+struct PlayerDeathTimer {
+    remaining_seconds: f32,
 }
 
 pub struct PlayerServerPlugin;
 
 impl Plugin for PlayerServerPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<PlayerSpawnMode>();
         app.add_observer(handle_connected);
 
         app.add_systems(
             FixedUpdate,
             (
-                player_movement,
-                update_player_aim_direction,
+                authoritative_player_movement,
+                authoritative_player_aim,
                 add_requested_aristeia,
+                restore_safezone_health,
                 apply_enemy_contact_damage,
+                tick_player_death,
                 control_dedicated_server_camera,
                 tick_player_aristeia,
             )
                 .chain()
                 .in_set(FixedGameplaySet::Player)
                 .run_if(in_state(ServerState::Hosting)),
-        );
-
-        app.add_systems(
-            FixedUpdate,
-            debug_switch_rooms.run_if(in_state(ServerState::Hosting)),
         );
     }
 }
@@ -128,7 +101,6 @@ fn tick_player_aristeia(mut players: Query<&mut PlayerAristeia>) {
 pub(crate) fn handle_connected(
     trigger: On<Add, Connected>,
     query: Query<&RemoteId, With<ClientOf>>,
-    spawn_mode: Res<PlayerSpawnMode>,
     settings: Res<GameSettings>,
     mut commands: Commands,
 ) {
@@ -137,10 +109,7 @@ pub(crate) fn handle_connected(
     };
 
     let client_id = client_id.0;
-    let room = GameRoom {
-        room: GameRooms::Arena,
-    };
-    let spawn_position = choose_player_spawn(*spawn_mode, room, &settings);
+    let spawn_position = settings.world.safezone_bounds().center();
 
     let entity = commands
         .spawn((
@@ -148,10 +117,16 @@ pub(crate) fn handle_connected(
             PlayerBundle::new(
                 client_id,
                 spawn_position,
+                settings.player.maximum_health,
                 settings.player.aristeia_duration_ticks,
+                settings.projectile.buffer_capacity,
             ),
             PlayerVisual,
             EnemyContactDamageCooldown::default(),
+            PlayerDeathTimer::default(),
+            PortalTeleportCooldown {
+                remaining_ticks: settings.portal.teleport_cooldown_ticks,
+            },
             ActionState::<PlayerAction>::default(),
             Replicate::to_clients(NetworkTarget::All),
             PredictionTarget::to_clients(NetworkTarget::Single(client_id)),
@@ -171,49 +146,60 @@ pub(crate) fn handle_connected(
     );
 }
 
-fn choose_player_spawn(mode: PlayerSpawnMode, room: GameRoom, settings: &GameSettings) -> Vec2 {
-    let bounds = room
-        .bounds(&settings.world)
-        .inflate(-settings.player.half_size);
+pub(crate) fn authoritative_player_movement(
+    settings: Res<GameSettings>,
+    mut players: Query<
+        (
+            Has<Predicted>,
+            &mut PlayerPosition,
+            &GameRoom,
+            &PlayerHealth,
+            &ActionState<PlayerAction>,
+        ),
+        With<PlayerId>,
+    >,
+    host_server: Query<(), With<lightyear::connection::host::HostServer>>,
+) {
+    let skip_predicted = !host_server.is_empty();
 
-    match mode {
-        PlayerSpawnMode::Fixed(position) => position.clamp(bounds.min, bounds.max),
-        PlayerSpawnMode::Annulus {
-            center,
-            minimum_radius,
-            maximum_radius,
-        } => {
-            let minimum_radius = minimum_radius.max(0.0);
-            let maximum_radius = maximum_radius.max(minimum_radius);
-            let mut rng = rand::rng();
-
-            for _ in 0..settings.player.spawn_attempts {
-                let angle = rng.random_range(0.0..std::f32::consts::TAU);
-                let radius_squared = rng.random_range(
-                    minimum_radius * minimum_radius..=maximum_radius * maximum_radius,
-                );
-                let radius = radius_squared.sqrt();
-                let candidate = center + Vec2::new(angle.cos(), angle.sin()) * radius;
-
-                if bounds.contains(candidate) {
-                    return candidate;
-                }
-            }
-
-            // A malformed or impossible annulus still produces a valid position.
-            center.clamp(bounds.min, bounds.max)
+    for (predicted, mut position, room, health, actions) in &mut players {
+        if skip_predicted && predicted {
+            continue;
         }
+
+        apply_player_movement(&mut position, room, health, actions, &settings);
     }
 }
 
-pub(crate) fn update_player_aim_direction(
-    mut players: Query<(&ActionState<PlayerAction>, &mut PlayerAimDirection)>,
+pub(crate) fn authoritative_player_aim(
+    mut players: Query<
+        (
+            Has<Predicted>,
+            &ActionState<PlayerAction>,
+            &mut PlayerAimDirection,
+        ),
+        With<PlayerId>,
+    >,
+    host_server: Query<(), With<lightyear::connection::host::HostServer>>,
 ) {
-    for (actions, mut aim_direction) in &mut players {
-        let aim = actions.clamped_axis_pair(&PlayerAction::Aim);
+    let skip_predicted = !host_server.is_empty();
 
-        if aim.length_squared() > 0.0001 {
-            aim_direction.0 = aim.normalize_or_zero();
+    for (predicted, actions, mut aim_direction) in &mut players {
+        if skip_predicted && predicted {
+            continue;
+        }
+
+        apply_player_aim(&mut aim_direction, actions);
+    }
+}
+
+fn restore_safezone_health(mut players: Query<(&GameRoom, &mut PlayerHealth), With<ControlledBy>>) {
+    for (room, mut health) in &mut players {
+        if room.room == GameRooms::Safezone
+            && health.current > 0
+            && health.current != health.maximum
+        {
+            health.current = health.maximum;
         }
     }
 }
@@ -227,13 +213,16 @@ fn apply_enemy_contact_damage(
             &GameRoom,
             &mut PlayerHealth,
             &mut EnemyContactDamageCooldown,
+            &mut PlayerDeathTimer,
         ),
         With<ControlledBy>,
     >,
-    enemies: Query<(&EnemyPosition, &EnemyHealth)>,
+    enemies: Query<(&EnemyPosition, &EnemyHealth, &EnemyKind)>,
     settings: Res<GameSettings>,
 ) {
-    for (player_entity, player_position, room, mut health, mut cooldown) in &mut players {
+    for (player_entity, player_position, room, mut health, mut cooldown, mut death_timer) in
+        &mut players
+    {
         cooldown.remaining_seconds = (cooldown.remaining_seconds - time.delta_secs()).max(0.0);
 
         if room.room != GameRooms::Arena || health.current == 0 || cooldown.remaining_seconds > 0.0
@@ -241,13 +230,13 @@ fn apply_enemy_contact_damage(
             continue;
         }
 
-        let touching_enemy = enemies.iter().any(|(enemy_position, enemy_health)| {
+        let touching_enemy = enemies.iter().any(|(enemy_position, enemy_health, kind)| {
             if enemy_health.current == 0 {
                 return false;
             }
 
-            let collision_radius =
-                settings.player.collision_radius + settings.enemy.collision_radius;
+            let collision_radius = settings.player.collision_radius
+                + kind.collision_radius(settings.enemy.collision_radius);
             player_position.0.distance_squared(enemy_position.0)
                 <= collision_radius * collision_radius
         });
@@ -268,19 +257,49 @@ fn apply_enemy_contact_damage(
             maximum_health = health.maximum,
             "Player took enemy contact damage"
         );
+
+        if health.current == 0 {
+            death_timer.remaining_seconds = settings.player.death_screen_duration_seconds;
+            info!(?player_entity, "Player died");
+        }
     }
 }
 
-pub(crate) fn debug_switch_rooms(
-    mut player_query: Query<(&ActionState<PlayerAction>, &mut GameRoom)>,
+fn tick_player_death(
+    time: Res<Time>,
+    settings: Res<GameSettings>,
+    mut players: Query<
+        (
+            Entity,
+            &mut PlayerPosition,
+            &mut GameRoom,
+            &mut PlayerHealth,
+            &mut PlayerDeathTimer,
+            &mut PortalTeleportCooldown,
+        ),
+        With<ControlledBy>,
+    >,
 ) {
-    for (actions, mut room) in &mut player_query {
-        if actions.just_pressed(&PlayerAction::DebugSwitchRooms) {
-            room.room = match room.room {
-                GameRooms::Arena => GameRooms::Safezone,
-                GameRooms::Safezone => GameRooms::Arena,
-            }
+    let safezone_center = settings.world.safezone_bounds().center();
+
+    for (player_entity, mut position, mut room, mut health, mut death_timer, mut portal_cooldown) in
+        &mut players
+    {
+        if health.current > 0 || death_timer.remaining_seconds <= 0.0 {
+            continue;
         }
+
+        death_timer.remaining_seconds =
+            (death_timer.remaining_seconds - time.delta_secs()).max(0.0);
+        if death_timer.remaining_seconds > 0.0 {
+            continue;
+        }
+
+        health.current = health.maximum;
+        room.room = GameRooms::Safezone;
+        position.0 = safezone_center;
+        portal_cooldown.remaining_ticks = settings.portal.teleport_cooldown_ticks;
+        info!(?player_entity, "Player respawned in the pit");
     }
 }
 
@@ -385,18 +404,4 @@ fn axis(
     let positive_pressed = keyboard.pressed(positive) || keyboard.pressed(alternate_positive);
 
     positive_pressed as i8 as f32 - negative_pressed as i8 as f32
-}
-
-#[allow(unused)]
-fn draw_world_boundaries(settings: Res<GameSettings>, mut gizmos: Gizmos) {
-    for bounds in [
-        settings.world.arena_bounds(),
-        settings.world.safezone_bounds(),
-    ] {
-        gizmos.rect_2d(
-            Isometry2d::from_translation(bounds.center()),
-            bounds.size(),
-            Color::srgb(0.95, 0.25, 0.2),
-        );
-    }
 }

@@ -13,6 +13,7 @@ impl Plugin for EnemyProtocolPlugin {
 
         app.component::<EnemyHealth>().replicate();
         app.component::<EnemyKind>().replicate();
+        app.component::<EnemySpawnerPosition>().replicate();
     }
 }
 
@@ -47,3 +48,22 @@ pub enum EnemyKind {
     Regular,
     GrandChampion,
 }
+
+impl EnemyKind {
+    pub fn collision_radius(self, base: f32) -> f32 {
+        match self {
+            Self::Regular => base,
+            Self::GrandChampion => base * 4.0,
+        }
+    }
+
+    pub fn display_size(self, base: f32) -> f32 {
+        match self {
+            Self::Regular => base,
+            Self::GrandChampion => base * 4.0,
+        }
+    }
+}
+
+#[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq, Reflect, Deref, DerefMut)]
+pub struct EnemySpawnerPosition(pub Vec2);
