@@ -1,5 +1,8 @@
 use crate::app::game_is_active;
-use crate::enemy::protocol::{EnemyHealth, EnemyKind, EnemyPosition, EnemySpawnerPosition};
+use crate::combat::HitFlash;
+use crate::enemy::protocol::{
+    EnemyHealth, EnemyIdentity, EnemyKind, EnemyPosition, EnemySpawnerPosition,
+};
 use crate::settings::GameSettings;
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
@@ -22,6 +25,7 @@ impl Plugin for EnemyRenderPlugin {
                 ensure_enemy_sprites,
                 sync_enemy_sprites,
                 animate_enemy_sprites,
+                sync_enemy_hit_flashes,
                 ensure_enemy_health_bars,
                 sync_enemy_health_bars,
                 ensure_spawner_sprites,
@@ -44,14 +48,18 @@ struct IdleSheet {
 #[derive(Resource)]
 struct EnemyVisualAssets {
     regular: IdleSheet,
+    regular_flash: IdleSheet,
     champion: IdleSheet,
     spawner: IdleSheet,
 }
 
 #[derive(Component)]
 struct EnemySpriteVisual {
+    kind: EnemyKind,
     previous_position: Option<Vec2>,
     frame_count: usize,
+    last_flash_sequence: u32,
+    flash_remaining: f32,
 }
 
 #[derive(Component)]
@@ -80,16 +88,22 @@ fn load_enemy_visual_assets(
     asset_server: Res<AssetServer>,
     mut layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
+    let regular_layout = layouts.add(TextureAtlasLayout::from_grid(
+        UVec2::splat(16),
+        4,
+        1,
+        None,
+        None,
+    ));
     commands.insert_resource(EnemyVisualAssets {
         regular: IdleSheet {
             image: asset_server.load("enemy/spr_enemy_placeholder_idle.png"),
-            layout: layouts.add(TextureAtlasLayout::from_grid(
-                UVec2::splat(16),
-                4,
-                1,
-                None,
-                None,
-            )),
+            layout: regular_layout.clone(),
+            frame_count: 4,
+        },
+        regular_flash: IdleSheet {
+            image: asset_server.load("enemy/spr_enemy_placeholder_idle_flash.png"),
+            layout: regular_layout,
             frame_count: 4,
         },
         champion: IdleSheet {
@@ -120,10 +134,10 @@ fn load_enemy_visual_assets(
 fn ensure_enemy_sprites(
     mut commands: Commands,
     assets: Res<EnemyVisualAssets>,
-    enemies: Query<(Entity, &EnemyKind), (With<EnemyPosition>, Without<EnemySpriteVisual>)>,
+    enemies: Query<(Entity, &EnemyIdentity), (With<EnemyPosition>, Without<EnemySpriteVisual>)>,
 ) {
-    for (entity, kind) in &enemies {
-        let sheet = match kind {
+    for (entity, identity) in &enemies {
+        let sheet = match identity.kind {
             EnemyKind::Regular => &assets.regular,
             EnemyKind::GrandChampion => &assets.champion,
         };
@@ -142,8 +156,11 @@ fn ensure_enemy_sprites(
                 ..default()
             },
             EnemySpriteVisual {
+                kind: identity.kind,
                 previous_position: None,
                 frame_count: sheet.frame_count,
+                last_flash_sequence: 0,
+                flash_remaining: 0.0,
             },
             EnemySpriteAnimation(Timer::from_seconds(
                 IDLE_FRAME_SECONDS,
@@ -192,28 +209,58 @@ fn animate_enemy_sprites(
     }
 }
 
+fn sync_enemy_hit_flashes(
+    time: Res<Time>,
+    settings: Res<GameSettings>,
+    assets: Res<EnemyVisualAssets>,
+    mut enemies: Query<(&HitFlash, &mut EnemySpriteVisual, &mut Sprite)>,
+) {
+    let flash_duration = settings.combat_feedback.flash_duration_seconds;
+    let flash_color = settings.combat_feedback.flash_color;
+    for (flash, mut visual, mut sprite) in &mut enemies {
+        if let Some(duration) = flash.observe(&mut visual.last_flash_sequence, flash_duration) {
+            visual.flash_remaining = duration;
+        }
+
+        if visual.flash_remaining > 0.0 {
+            visual.flash_remaining = (visual.flash_remaining - time.delta_secs()).max(0.0);
+        }
+
+        let flashing = visual.flash_remaining > 0.0;
+        let sheet = match (visual.kind, flashing) {
+            (EnemyKind::Regular, true) => &assets.regular_flash,
+            (EnemyKind::Regular, false) => &assets.regular,
+            (EnemyKind::GrandChampion, _) => &assets.champion,
+        };
+        sprite.image = sheet.image.clone();
+        sprite.color = if flashing { flash_color } else { Color::WHITE };
+    }
+}
+
 fn enemy_health_bar_layout(
     settings: &GameSettings,
     kind: EnemyKind,
     position: Vec2,
 ) -> (Vec2, f32) {
-    let width = kind.display_size(settings.enemy.size);
-    let height = settings.player.health_bar_height;
+    let width = kind.scale(settings.enemy.size);
+    let height = settings.player_visual.health_bar_height;
     (Vec2::new(width, height), position.y + width + height)
 }
 
 fn ensure_enemy_health_bars(
     mut commands: Commands,
     settings: Res<GameSettings>,
-    enemies: Query<(Entity, &EnemyPosition, &EnemyKind)>,
+    enemies: Query<(Entity, &EnemyPosition, &EnemyIdentity)>,
     backgrounds: Query<&EnemyHealthBarBackground>,
 ) {
-    for (enemy, position, kind) in &enemies {
-        if backgrounds.iter().any(|bar| bar.enemy == enemy) {
+    for (enemy, position, identity) in &enemies {
+        if identity.kind == EnemyKind::GrandChampion
+            || backgrounds.iter().any(|bar| bar.enemy == enemy)
+        {
             continue;
         }
 
-        let (bar_size, center_y) = enemy_health_bar_layout(&settings, *kind, position.0);
+        let (bar_size, center_y) = enemy_health_bar_layout(&settings, identity.kind, position.0);
         let center = Vec2::new(position.0.x, center_y);
 
         commands.spawn((
@@ -235,7 +282,7 @@ fn ensure_enemy_health_bars(
 fn sync_enemy_health_bars(
     settings: Res<GameSettings>,
     mut commands: Commands,
-    enemies: Query<(&EnemyPosition, &EnemyHealth, &EnemyKind)>,
+    enemies: Query<(&EnemyPosition, &EnemyHealth, &EnemyIdentity)>,
     mut backgrounds: Query<
         (
             Entity,
@@ -251,24 +298,24 @@ fn sync_enemy_health_bars(
     >,
 ) {
     for (entity, bar, mut sprite, mut transform) in &mut backgrounds {
-        let Ok((position, _, kind)) = enemies.get(bar.enemy) else {
+        let Ok((position, _, identity)) = enemies.get(bar.enemy) else {
             commands.entity(entity).despawn();
             continue;
         };
 
-        let (full_size, center_y) = enemy_health_bar_layout(&settings, *kind, position.0);
+        let (full_size, center_y) = enemy_health_bar_layout(&settings, identity.kind, position.0);
         sprite.color = Color::srgb(0.15, 0.05, 0.05);
         sprite.custom_size = Some(full_size);
         transform.translation = Vec2::new(position.0.x, center_y).extend(ENEMY_HEALTH_BAR_Z);
     }
 
     for (entity, bar, mut sprite, mut transform) in &mut fills {
-        let Ok((position, health, kind)) = enemies.get(bar.enemy) else {
+        let Ok((position, health, identity)) = enemies.get(bar.enemy) else {
             commands.entity(entity).despawn();
             continue;
         };
 
-        let (full_size, center_y) = enemy_health_bar_layout(&settings, *kind, position.0);
+        let (full_size, center_y) = enemy_health_bar_layout(&settings, identity.kind, position.0);
         let health_fraction = if health.maximum == 0 {
             0.0
         } else {

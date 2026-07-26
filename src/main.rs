@@ -1,10 +1,11 @@
 mod app;
+mod combat;
 mod enemy;
 mod fragment;
+mod gate;
 mod networking;
 mod persistence;
 mod player;
-mod portal;
 mod projectile;
 mod protocol;
 #[cfg(feature = "server")]
@@ -24,11 +25,12 @@ use bevy::prelude::*;
 use bevy::window::PresentMode;
 #[cfg(feature = "gui")]
 use bevy::winit::WinitSettings;
+use combat::CombatPlugin;
 use enemy::EnemyPlugin;
 use fragment::FragmentPlugin;
+use gate::GatePlugin;
 use persistence::PersistencePlugin;
 use player::PlayerPlugin;
-use portal::PortalPlugin;
 use projectile::ProjectilePlugin;
 #[cfg(feature = "server")]
 use server::ExampleServerPlugin;
@@ -57,7 +59,7 @@ fn main() -> ExitCode {
 }
 
 fn run() -> Result<(), GameSettingsLoadError> {
-    let settings = GameSettings::load("assets/game_settings.json")?;
+    let settings = GameSettings::load("assets/settings")?;
 
     let config = config_from_env();
     let mut app = base_app();
@@ -83,11 +85,12 @@ fn run() -> Result<(), GameSettingsLoadError> {
 
     app.add_plugins((
         WorldPlugin,
-        PortalPlugin,
+        GatePlugin,
         WeaponStationPlugin,
         UiPlugin,
         LaunchPlugin,
         SharedPlugin,
+        CombatPlugin,
         PlayerPlugin,
         EnemyPlugin,
         ProjectilePlugin,

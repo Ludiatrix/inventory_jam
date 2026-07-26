@@ -3,10 +3,11 @@ use lightyear::prelude::*;
 
 use crate::{
     app::ServerState,
-    enemy::{EnemyPosition, EnemySpawnerPosition},
+    enemy::{EnemyIdentity, EnemyKind, EnemyPosition, EnemySpawnerPosition},
+    fragment::Fragment,
+    gate::{GateKind, GatePosition},
     player::{PlayerId, PlayerPosition},
-    portal::{PortalKind, PortalPosition},
-    protocol::rooms::GameRoom,
+    protocol::rooms::{GameRoom, GameRooms},
     settings::GameSettings,
     shared::FixedGameplaySet,
 };
@@ -29,9 +30,10 @@ fn update_interest_visibility(
     settings: Res<GameSettings>,
     viewers: Query<(&PlayerPosition, &GameRoom, &ControlledBy), With<PlayerId>>,
     players: Query<(Entity, &PlayerPosition, &GameRoom), With<PlayerId>>,
-    enemies: Query<(Entity, &EnemyPosition, &GameRoom)>,
+    enemies: Query<(Entity, &EnemyPosition, &EnemyIdentity, &GameRoom)>,
     spawners: Query<(Entity, &EnemySpawnerPosition, &GameRoom)>,
-    portals: Query<(Entity, &PortalKind, &PortalPosition)>,
+    fragments: Query<(Entity, &Fragment)>,
+    gates: Query<(Entity, &GateKind, &GatePosition)>,
 ) {
     let radius_sq = settings.network.interest_radius.powi(2);
 
@@ -48,14 +50,11 @@ fn update_interest_visibility(
             );
         }
 
-        for (entity, position, room) in &enemies {
-            set_visibility(
-                &mut commands,
-                entity,
-                sender,
-                room.room == viewer_room.room
-                    && viewer_position.0.distance_squared(position.0) <= radius_sq,
-            );
+        for (entity, position, identity, room) in &enemies {
+            let visible = identity.kind == EnemyKind::GrandChampion
+                || (room.room == viewer_room.room
+                    && viewer_position.0.distance_squared(position.0) <= radius_sq);
+            set_visibility(&mut commands, entity, sender, visible);
         }
 
         for (entity, position, room) in &spawners {
@@ -68,7 +67,17 @@ fn update_interest_visibility(
             );
         }
 
-        for (entity, kind, position) in &portals {
+        for (entity, fragment) in &fragments {
+            set_visibility(
+                &mut commands,
+                entity,
+                sender,
+                viewer_room.room == GameRooms::Arena
+                    && viewer_position.0.distance_squared(fragment.position) <= radius_sq,
+            );
+        }
+
+        for (entity, kind, position) in &gates {
             set_visibility(
                 &mut commands,
                 entity,

@@ -5,12 +5,40 @@ use bevy::{
 };
 use leafwing_input_manager::action_state::ActionState;
 use lightyear::prediction::Predicted;
+use rand::Rng;
 
 use crate::{
+    persistence::CachedPersistentState,
     player::protocol::{PlayerAimDirection, PlayerHealth, PlayerPosition},
     protocol::{inputs::PlayerAction, rooms::GameRoom},
     settings::GameSettings,
 };
+
+pub fn apply_damage_to_player(
+    health: &mut PlayerHealth,
+    raw_damage: u32,
+    armor: u32,
+    rng: &mut impl Rng,
+) -> u32 {
+    let blocked = if armor == 0 {
+        0
+    } else {
+        rng.random_range(0..=armor)
+    };
+    let damage = raw_damage.saturating_sub(blocked);
+    health.current = health.current.saturating_sub(damage);
+    damage
+}
+
+pub fn armor_from_cache(settings: &GameSettings, cache: Option<&CachedPersistentState>) -> u32 {
+    cache
+        .map(|cache| {
+            settings
+                .progression
+                .armor_at(cache.weapon(cache.equipped_weapon_id).armor_level)
+        })
+        .unwrap_or(0)
+}
 
 pub fn apply_player_movement(
     position: &mut PlayerPosition,

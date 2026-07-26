@@ -1,17 +1,15 @@
-#[cfg(feature = "dev")]
-use crate::protocol::inputs::PlayerAction;
 use crate::protocol::rooms::GameRoom;
 #[cfg(feature = "server")]
 use crate::protocol::rooms::GameRooms;
 use bevy::math::Curve;
 use bevy::prelude::*;
-#[cfg(feature = "dev")]
-use leafwing_input_manager::action_state::ActionState;
 use lightyear::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "server")]
 use crate::app::temporary_username;
+#[cfg(feature = "server")]
+use crate::combat::HitFlash;
 
 pub struct PlayerProtocolPlugin;
 
@@ -19,8 +17,6 @@ impl Plugin for PlayerProtocolPlugin {
     fn build(&self, app: &mut App) {
         app.component::<PlayerId>().replicate();
 
-        #[cfg(feature = "dev")]
-        app.add_systems(PostUpdate, debug_player_position);
         app.component::<PlayerPosition>()
             .replicate()
             .predict()
@@ -40,26 +36,6 @@ impl Plugin for PlayerProtocolPlugin {
     }
 }
 
-#[cfg(feature = "dev")]
-#[allow(unused)]
-fn debug_player_position(
-    q: Query<(Entity, &PlayerPosition, &ActionState<PlayerAction>)>,
-    local_timeline: Res<LocalTimeline>,
-) {
-    for (entity, position, actions) in q.iter() {
-        let movement = actions.clamped_axis_pair(&PlayerAction::Move);
-
-        if movement != Vec2::ZERO {
-            // info!(
-            //     "Player Pos: {:?} {:?} {:?}",
-            //     local_timeline.tick(),
-            //     position,
-            //     entity
-            // );
-        }
-    }
-}
-
 #[cfg(feature = "server")]
 #[derive(Bundle)]
 pub(crate) struct PlayerBundle {
@@ -71,6 +47,7 @@ pub(crate) struct PlayerBundle {
     username: PlayerUsername,
     health: PlayerHealth,
     aristeia: PlayerAristeia,
+    hit_flash: HitFlash,
     projectile_buffer: crate::projectile::protocol::ProjectileBuffer,
 }
 
@@ -80,7 +57,6 @@ impl PlayerBundle {
         id: PeerId,
         position: Vec2,
         maximum_health: u32,
-        aristeia_duration_ticks: u16,
         projectile_buffer_capacity: usize,
     ) -> Self {
         let h = (((id.to_bits().wrapping_mul(30)) % 360) as f32) / 360.0;
@@ -96,7 +72,8 @@ impl PlayerBundle {
             },
             username: PlayerUsername(temporary_username(id.to_bits())),
             health: PlayerHealth::new(maximum_health),
-            aristeia: PlayerAristeia::new(aristeia_duration_ticks),
+            aristeia: PlayerAristeia::default(),
+            hit_flash: HitFlash::default(),
             projectile_buffer: crate::projectile::protocol::ProjectileBuffer::new(
                 projectile_buffer_capacity,
             ),
@@ -149,35 +126,21 @@ impl PlayerHealth {
     }
 }
 
-// Used for Killstreak Tracking
-#[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Default)]
 pub(crate) struct PlayerAristeia {
-    /// Current Aristeia kill count or multiplier level.
     pub current: u32,
-
-    /// Remaining lifetime of the current Aristeia level, in fixed ticks.
-    pub remaining_ticks: u16,
-
-    /// Maximum lifetime used to calculate the UI bar fraction.
-    pub maximum_ticks: u16,
+    pub progress: u32,
+    pub remaining_seconds: f32,
+    pub maximum_seconds: f32,
 }
 
 impl PlayerAristeia {
-    pub(crate) const fn new(duration_ticks: u16) -> Self {
-        Self {
-            current: 0,
-            remaining_ticks: 0,
-            maximum_ticks: duration_ticks,
-        }
-    }
-
-    #[allow(unused)]
     pub fn remaining_fraction(&self) -> f32 {
-        if self.maximum_ticks == 0 {
+        if self.maximum_seconds <= 0.0 {
             return 0.0;
         }
 
-        (self.remaining_ticks as f32 / self.maximum_ticks as f32).clamp(0.0, 1.0)
+        (self.remaining_seconds / self.maximum_seconds).clamp(0.0, 1.0)
     }
 }
 

@@ -1,10 +1,18 @@
 use crate::app::ServerState;
+use crate::combat::HitFlash;
 use crate::enemy::api::SpawnEnemy;
-use crate::enemy::protocol::{EnemyHealth, EnemyKind, EnemyPosition, EnemySpawnerPosition};
+use crate::enemy::protocol::{
+    BossAttackState, BossPatternKind, EnemyAi, EnemyHealth, EnemyIdentity, EnemyKind,
+    EnemyPosition, EnemySpawnerPosition,
+};
+use crate::enemy::shared::{fire_enemy_projectiles, simulate_enemy_ai};
+use crate::player::PlayerPosition;
 use crate::player::protocol::PlayerHealth;
-use crate::player::{PlayerId, PlayerPosition};
+use crate::projectile::protocol::ProjectileBuffer;
 use crate::protocol::rooms::{GameRoom, GameRooms};
 use crate::settings::GameSettings;
+use crate::shared::FixedGameplaySet;
+use crate::weapon::protocol::WeaponCooldown;
 use bevy::prelude::*;
 use lightyear::prelude::*;
 use rand::Rng;
@@ -16,7 +24,9 @@ impl Plugin for EnemyServerPlugin {
         app.add_message::<SpawnEnemy>();
         app.configure_sets(
             FixedUpdate,
-            (EnemySpawnSet::Request, EnemySpawnSet::Spawn).chain(),
+            (EnemySpawnSet::Request, EnemySpawnSet::Spawn)
+                .chain()
+                .before(FixedGameplaySet::Enemy),
         );
         app.add_systems(OnEnter(ServerState::Hosting), place_enemy_spawners);
         app.add_systems(
@@ -26,7 +36,9 @@ impl Plugin for EnemyServerPlugin {
                     .chain()
                     .in_set(EnemySpawnSet::Request),
                 spawn_requested_enemy.in_set(EnemySpawnSet::Spawn),
-                simulate_enemy_ai.after(EnemySpawnSet::Spawn),
+                (simulate_enemy_ai, fire_enemy_projectiles)
+                    .chain()
+                    .in_set(FixedGameplaySet::Enemy),
             )
                 .run_if(in_state(ServerState::Hosting)),
         );
@@ -40,24 +52,13 @@ pub(crate) enum EnemySpawnSet {
 }
 
 #[derive(Component, Clone, Copy, Debug)]
-pub(crate) struct EnemyHome(pub Vec2);
-
-#[derive(Component, Clone, Copy, Debug)]
-pub(crate) struct EnemyWanderTarget(pub Vec2);
-
-#[derive(Component, Clone, Copy, Debug)]
 pub(crate) struct EnemySpawnerOwner(pub Entity);
 
 #[derive(Component, Clone, Copy, Debug, Default)]
 pub(crate) struct SpawnerSpawnAccumulator(pub f32);
 
-#[derive(Component, Clone, Copy, Debug, Default)]
-pub(crate) enum EnemyBehavior {
-    #[default]
-    Wandering,
-    Chasing(PeerId),
-    Returning,
-}
+#[derive(Component, Clone, Copy, Debug)]
+pub(crate) struct SpawnerTierIndex(pub u8);
 
 fn place_enemy_spawners(
     mut commands: Commands,
@@ -78,8 +79,10 @@ fn place_enemy_spawners(
             break;
         };
         positions.push(position);
+        let tier_index = settings.spawner.tier_index_for_distance(position.length());
         commands.spawn((
             EnemySpawnerPosition(position),
+            SpawnerTierIndex(tier_index),
             SpawnerSpawnAccumulator::default(),
             GameRoom {
                 room: GameRooms::Arena,
@@ -118,7 +121,7 @@ fn despawn_distant_enemies(
     mut commands: Commands,
     settings: Res<GameSettings>,
     players: Query<(&PlayerPosition, &PlayerHealth, &GameRoom)>,
-    enemies: Query<(Entity, &EnemyPosition, &EnemyKind)>,
+    enemies: Query<(Entity, &EnemyPosition, &EnemyIdentity)>,
 ) {
     let active_players: Vec<Vec2> = players
         .iter()
@@ -127,8 +130,8 @@ fn despawn_distant_enemies(
         .collect();
 
     if active_players.is_empty() {
-        for (entity, _, kind) in &enemies {
-            if *kind == EnemyKind::Regular {
+        for (entity, _, identity) in &enemies {
+            if identity.kind == EnemyKind::Regular {
                 commands.entity(entity).despawn();
             }
         }
@@ -136,8 +139,8 @@ fn despawn_distant_enemies(
     }
 
     let retention_sq = settings.enemy.despawn_distance_from_players.powi(2);
-    for (entity, position, kind) in &enemies {
-        if *kind != EnemyKind::Regular {
+    for (entity, position, identity) in &enemies {
+        if identity.kind != EnemyKind::Regular {
             continue;
         }
         if active_players
@@ -156,10 +159,15 @@ fn tick_enemy_spawners(
     enemies: Query<(
         &EnemyPosition,
         &EnemyHealth,
-        &EnemyKind,
+        &EnemyIdentity,
         Option<&EnemySpawnerOwner>,
     )>,
-    mut spawners: Query<(Entity, &EnemySpawnerPosition, &mut SpawnerSpawnAccumulator)>,
+    mut spawners: Query<(
+        Entity,
+        &EnemySpawnerPosition,
+        &SpawnerTierIndex,
+        &mut SpawnerSpawnAccumulator,
+    )>,
     mut spawn_messages: MessageWriter<SpawnEnemy>,
 ) {
     let active_players: Vec<Vec2> = players
@@ -178,11 +186,18 @@ fn tick_enemy_spawners(
         .inflate(-settings.enemy.collision_radius);
     let mut occupied: Vec<Vec2> = enemies
         .iter()
-        .filter(|(_, health, kind, _)| health.current > 0 && **kind == EnemyKind::Regular)
+        .filter(|(_, health, identity, _)| {
+            health.current > 0 && identity.kind == EnemyKind::Regular
+        })
         .map(|(position, _, _, _)| position.0)
         .collect();
 
-    for (spawner_entity, spawner, mut accumulator) in &mut spawners {
+    for (spawner_entity, spawner, tier_index, mut accumulator) in &mut spawners {
+        let tier = settings.spawner.tier(tier_index.0);
+        let max_owned =
+            ((settings.spawner.max_owned as f32) * tier.max_owned_multiplier).round() as usize;
+        let spawn_rate = settings.spawner.spawn_rate_per_second * tier.spawn_rate_multiplier;
+
         let player_nearby = active_players
             .iter()
             .any(|player| player.distance_squared(spawner.0) <= activation_sq);
@@ -193,19 +208,19 @@ fn tick_enemy_spawners(
 
         let owned = enemies
             .iter()
-            .filter(|(_, health, kind, owner)| {
+            .filter(|(_, health, identity, owner)| {
                 health.current > 0
-                    && **kind == EnemyKind::Regular
+                    && identity.kind == EnemyKind::Regular
                     && owner.is_some_and(|owner| owner.0 == spawner_entity)
             })
             .count();
-        if owned >= settings.spawner.max_owned {
+        if owned >= max_owned {
             accumulator.0 = 0.0;
             continue;
         }
 
-        accumulator.0 += settings.spawner.spawn_rate_per_second * time.delta_secs();
-        let mut remaining_slots = settings.spawner.max_owned - owned;
+        accumulator.0 += spawn_rate * time.delta_secs();
+        let mut remaining_slots = max_owned - owned;
         while accumulator.0 >= 1.0 && remaining_slots > 0 {
             let Some(candidate) =
                 best_spawn_candidate(spawner.0, &active_players, &occupied, bounds, &settings)
@@ -213,7 +228,7 @@ fn tick_enemy_spawners(
                 break;
             };
             occupied.push(candidate);
-            spawn_messages.write(SpawnEnemy::regular(candidate, spawner_entity));
+            spawn_messages.write(SpawnEnemy::regular(candidate, spawner_entity, tier_index.0));
             accumulator.0 -= 1.0;
             remaining_slots -= 1;
         }
@@ -261,145 +276,72 @@ pub(crate) fn spawn_requested_enemy(
     spawners: Query<&EnemySpawnerPosition>,
     mut requests: MessageReader<SpawnEnemy>,
 ) {
+    let mut rng = rand::rng();
     for request in requests.read() {
-        let health = match request.kind {
-            EnemyKind::Regular => settings.enemy.max_health,
-            EnemyKind::GrandChampion => settings.global_aristeia.grand_champion_health,
-        };
         let home = request
             .spawner
             .and_then(|spawner| spawners.get(spawner).ok())
             .map(|position| position.0)
             .unwrap_or(request.position);
-        spawn_enemy(
-            &mut commands,
-            request.position,
-            home,
-            health,
-            request.kind,
-            request.spawner,
-        );
-    }
-}
-
-fn spawn_enemy(
-    commands: &mut Commands,
-    position: Vec2,
-    home: Vec2,
-    max_health: u32,
-    kind: EnemyKind,
-    spawner: Option<Entity>,
-) -> Entity {
-    let mut entity = commands.spawn((
-        EnemyPosition(position),
-        EnemyHome(home),
-        EnemyWanderTarget(position),
-        EnemyBehavior::Wandering,
-        EnemyHealth::new(max_health),
-        kind,
-        GameRoom {
-            room: GameRooms::Arena,
-        },
-        Replicate::to_clients(NetworkTarget::All),
-        InterpolationTarget::to_clients(NetworkTarget::All),
-        Name::new(match kind {
-            EnemyKind::Regular => "Enemy",
-            EnemyKind::GrandChampion => "Grand Champion",
-        }),
-    ));
-    if let Some(spawner) = spawner {
-        entity.insert(EnemySpawnerOwner(spawner));
-    }
-    entity.id()
-}
-
-fn simulate_enemy_ai(
-    time: Res<Time>,
-    settings: Res<GameSettings>,
-    mut enemies: Query<(
-        &mut EnemyPosition,
-        &EnemyHome,
-        &mut EnemyWanderTarget,
-        &mut EnemyBehavior,
-        &EnemyKind,
-    )>,
-    players: Query<(&PlayerId, &PlayerPosition, &PlayerHealth, &GameRoom)>,
-) {
-    let mut rng = rand::rng();
-    let arena = settings.world.arena_bounds();
-    let dt = time.delta_secs();
-
-    for (mut position, home, mut wander_target, mut behavior, kind) in &mut enemies {
-        let collision_radius = kind.collision_radius(settings.enemy.collision_radius);
-        let arena = arena.inflate(-collision_radius);
-        let (speed, detection, leash, wander_radius) = match kind {
-            EnemyKind::Regular => (
-                settings.enemy.move_speed * dt,
-                settings.enemy.detection_radius,
-                settings.enemy.leash_radius,
-                settings.enemy.wander_radius,
-            ),
-            EnemyKind::GrandChampion => (
-                settings.global_aristeia.grand_champion_move_speed * dt,
-                settings.global_aristeia.grand_champion_detection_radius,
-                settings.global_aristeia.grand_champion_leash_radius,
-                0.0,
-            ),
+        let ai_seed = rng.random::<u64>();
+        let identity = match request.kind {
+            EnemyKind::Regular => {
+                let tier_index = request
+                    .tier_index
+                    .unwrap_or_else(|| settings.spawner.tier_index_for_distance(home.length()));
+                EnemyIdentity {
+                    kind: EnemyKind::Regular,
+                    tier_index,
+                    is_ranged: rng.random::<f32>()
+                        < settings.spawner.tier(tier_index).ranged_chance,
+                    ai_seed,
+                }
+            }
+            EnemyKind::GrandChampion => EnemyIdentity {
+                kind: EnemyKind::GrandChampion,
+                tier_index: 0,
+                is_ranged: true,
+                ai_seed,
+            },
         };
-
-        let nearest = players
-            .iter()
-            .filter(|(_, _, health, room)| health.current > 0 && room.room == GameRooms::Arena)
-            .map(|(id, pos, _, _)| (id.0, pos.0, position.0.distance_squared(pos.0)))
-            .filter(|(_, _, d)| *d <= detection * detection)
-            .min_by(|a, b| a.2.total_cmp(&b.2));
-
-        match *behavior {
-            EnemyBehavior::Wandering => {
-                if let Some((id, _, _)) = nearest {
-                    *behavior = EnemyBehavior::Chasing(id);
-                    continue;
-                }
-                if position.0.distance_squared(wander_target.0) <= speed * speed {
-                    let angle = rng.random_range(0.0..std::f32::consts::TAU);
-                    let radius = rng.random_range(0.0..=wander_radius * wander_radius).sqrt();
-                    wander_target.0 = (home.0 + Vec2::new(angle.cos(), angle.sin()) * radius)
-                        .clamp(arena.min, arena.max);
-                }
-                move_toward(&mut position.0, wander_target.0, speed);
-            }
-            EnemyBehavior::Chasing(target_id) => {
-                let target = players
-                    .iter()
-                    .find(|(id, _, health, room)| {
-                        id.0 == target_id && health.current > 0 && room.room == GameRooms::Arena
-                    })
-                    .map(|(_, p, _, _)| p.0);
-                if position.0.distance_squared(home.0) > leash * leash || target.is_none() {
-                    *behavior = EnemyBehavior::Returning;
-                } else if let Some(target) = target {
-                    move_toward(&mut position.0, target, speed);
-                }
-            }
-            EnemyBehavior::Returning => {
-                move_toward(&mut position.0, home.0, speed);
-                if position.0.distance_squared(home.0) <= speed * speed {
-                    position.0 = home.0;
-                    wander_target.0 = home.0;
-                    *behavior = EnemyBehavior::Wandering;
-                }
-            }
+        let kind = identity.kind;
+        let max_health = identity.max_health(&settings);
+        let buffer_capacity = identity.projectile_buffer_capacity(&settings);
+        let mut entity = commands.spawn((
+            EnemyPosition(request.position),
+            EnemyAi {
+                home,
+                wander_target: home,
+                behavior: Default::default(),
+                engage_retarget_seconds: 0.0,
+                boss: (kind == EnemyKind::GrandChampion).then_some(BossAttackState {
+                    pattern: BossPatternKind::Fan,
+                    pattern_elapsed_seconds: 0.0,
+                    volley_accumulator: 0.0,
+                    spiral_angle_radians: 0.0,
+                    radial_offset: false,
+                }),
+            },
+            EnemyHealth {
+                current: max_health,
+                maximum: max_health,
+            },
+            HitFlash::default(),
+            identity,
+            ProjectileBuffer::new(buffer_capacity),
+            WeaponCooldown::default(),
+            GameRoom {
+                room: GameRooms::Arena,
+            },
+            Replicate::to_clients(NetworkTarget::All),
+            PredictionTarget::to_clients(NetworkTarget::All),
+            Name::new(match kind {
+                EnemyKind::Regular => "Enemy",
+                EnemyKind::GrandChampion => "Grand Champion",
+            }),
+        ));
+        if let Some(spawner) = request.spawner {
+            entity.insert(EnemySpawnerOwner(spawner));
         }
-        position.0 = position.0.clamp(arena.min, arena.max);
-    }
-}
-
-fn move_toward(position: &mut Vec2, target: Vec2, speed: f32) {
-    let delta = target - *position;
-    let distance = delta.length();
-    if distance <= speed || distance == 0.0 {
-        *position = target;
-    } else {
-        *position += delta / distance * speed;
     }
 }

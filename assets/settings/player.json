@@ -1,0 +1,168 @@
+{
+  "player": {
+    "maximum_health": 100,
+    "enemy_contact_damage_interval_seconds": 0.5,
+    "death_screen_duration_seconds": 3.0,
+    "half_size": 12.0,
+    "collision_radius": 12.0,
+    "move_speed": 1.6,
+    "arena_health_regen_fraction_per_second": 0.01
+  },
+  "projectile": {
+    "impact_lifetime_ticks": 12,
+    "spawn_gap": 0.32,
+    "buffer_capacity": 32
+  },
+  "weapons": [
+    {
+      "id": 0,
+      "name": "Sword",
+      "damage": 35,
+      "range": 84.0,
+      "attacks_per_second": 2.5,
+      "projectile_speed": 240.0,
+      "projectile_radius": 24.0,
+      "icon": "weapon/sword/spr_icon_sword.png",
+      "projectile": {
+        "path": "weapon/sword/spr_vfx_projectile_sword.png",
+        "cell": [24, 48],
+        "frames": 4,
+        "frame_seconds": 0.08
+      },
+      "impact": {
+        "path": "weapon/sword/spr_vfx_impact_sword.png",
+        "cell": [24, 48],
+        "frames": 6,
+        "frame_seconds": 0.06
+      }
+    },
+    {
+      "id": 1,
+      "name": "Spear",
+      "damage": 60,
+      "range": 115.0,
+      "attacks_per_second": 1.5,
+      "projectile_speed": 310.0,
+      "projectile_radius": 12.0,
+      "icon": "weapon/spear/spr_icon_spear.png",
+      "projectile": {
+        "path": "weapon/spear/spr_vfx_projectile_spear.png",
+        "cell": [24, 24],
+        "frames": 6,
+        "frame_seconds": 0.06
+      },
+      "impact": {
+        "path": "weapon/spear/spr_vfx_impact_spear.png",
+        "cell": [24, 24],
+        "frames": 6,
+        "frame_seconds": 0.05
+      }
+    },
+    {
+      "id": 2,
+      "name": "Staff",
+      "damage": 40,
+      "range": 204.0,
+      "attacks_per_second": 1.5,
+      "projectile_speed": 430.0,
+      "projectile_radius": 24.0,
+      "icon": "weapon/staff/spr_icon_staff.png",
+      "projectile": {
+        "path": "weapon/staff/spr_vfx_projectile_staff.png",
+        "cell": [48, 48],
+        "frames": 8,
+        "frame_seconds": 0.06
+      },
+      "impact": {
+        "path": "weapon/staff/spr_vfx_impact_staff.png",
+        "cell": [96, 96],
+        "frames": 7,
+        "frame_seconds": 0.05
+      }
+    },
+    {
+      "id": 3,
+      "name": "Bow",
+      "damage": 40,
+      "range": 216.0,
+      "attacks_per_second": 1.5,
+      "projectile_speed": 430.0,
+      "projectile_radius": 0,
+      "icon": "weapon/bow/spr_icon_bow.png",
+      "projectile": {
+        "path": "weapon/bow/spr_vfx_projectile_arrow.png",
+        "cell": [24, 16],
+        "frames": 4,
+        "frame_seconds": 0.07
+      },
+      "impact": {
+        "path": "weapon/bow/spr_vfx_impact_arrow.png",
+        "cell": [24, 16],
+        "frames": 7,
+        "frame_seconds": 0.05
+      }
+    },
+    {
+      "id": 4,
+      "name": "Shuriken",
+      "damage": 25,
+      "range": 135.0,
+      "attacks_per_second": 3.0,
+      "projectile_speed": 335.0,
+      "projectile_radius": 8.0,
+      "icon": "weapon/shuriken/spr_icon_shuriken.png",
+      "projectile": {
+        "path": "weapon/shuriken/spr_vfx_projectile_shuriken.png",
+        "cell": [20, 16],
+        "frames": 4,
+        "frame_seconds": 0.05
+      },
+      "impact": {
+        "path": "weapon/shuriken/spr_vfx_impact_shuriken.png",
+        "cell": [8, 8],
+        "frames": 5,
+        "frame_seconds": 0.04
+      }
+    },
+    {
+      "id": 5,
+      "name": "Boomerang",
+      "damage": 50,
+      "range": 135.0,
+      "attacks_per_second": 1.5,
+      "projectile_speed": 335.0,
+      "projectile_radius": 16.0,
+      "icon": "weapon/boomerang/spr_icon_boomerang.png",
+      "projectile": {
+        "path": "weapon/boomerang/spr_vfx_projectile_boomerang.png",
+        "cell": [32, 32],
+        "frames": 16,
+        "frame_seconds": 0.04
+      },
+      "impact": {
+        "path": "weapon/boomerang/spr_vfx_part_boomerang_trail.png",
+        "cell": [8, 8],
+        "frames": 11,
+        "frame_seconds": 0.035
+      }
+    }
+  ],
+  "progression": {
+    "damage_bonus_per_level": 0.15,
+    "attack_speed_bonus_per_level": 0.15,
+    "pierce_per_level": 1,
+    "crit_chance_per_level": 0.05,
+    "crit_damage_multiplier": 2.0,
+    "armor_per_level": 2,
+    "max_health_per_level": 20,
+    "upgrade_cost_base": 10,
+    "upgrade_cost_level_scale": 10,
+    "upgrade_cost_level_power": 2
+  },
+  "mobile_controls": {
+    "joystick_size": 140.0,
+    "knob_size": 70.0,
+    "screen_inset": 24.0,
+    "movement_dead_zone": 0.15
+  }
+}

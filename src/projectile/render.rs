@@ -1,6 +1,6 @@
 use crate::{
     app::game_is_active,
-    projectile::protocol::{ProjectileBuffer, ProjectileSlot, ProjectileState},
+    projectile::protocol::{ProjectileBuffer, ProjectileSlot, ProjectileSource, ProjectileState},
     settings::{GameSettings, WeaponSpriteSheetSettings},
     weapon::protocol::WeaponId,
 };
@@ -33,11 +33,19 @@ struct AnimatedVisualAsset {
 #[derive(Resource)]
 struct ProjectileVisualAssets {
     by_weapon: HashMap<WeaponId, [AnimatedVisualAsset; 2]>,
+    enemy: [AnimatedVisualAsset; 2],
+    grand_champion: [AnimatedVisualAsset; 2],
 }
 
 impl ProjectileVisualAssets {
-    fn get(&self, id: WeaponId, impact: bool) -> Option<&AnimatedVisualAsset> {
-        self.by_weapon.get(&id).map(|pair| &pair[impact as usize])
+    fn get(&self, source: ProjectileSource, impact: bool) -> Option<&AnimatedVisualAsset> {
+        match source {
+            ProjectileSource::Weapon(id) => {
+                self.by_weapon.get(&id).map(|pair| &pair[impact as usize])
+            }
+            ProjectileSource::Enemy => Some(&self.enemy[impact as usize]),
+            ProjectileSource::GrandChampion => Some(&self.grand_champion[impact as usize]),
+        }
     }
 }
 
@@ -94,12 +102,26 @@ fn load_projectile_visual_assets(
             )
         })
         .collect();
-    commands.insert_resource(ProjectileVisualAssets { by_weapon });
+    let enemy = [
+        load_anim(
+            &asset_server,
+            &mut atlas_layouts,
+            &settings.enemy.projectile,
+        ),
+        load_anim(&asset_server, &mut atlas_layouts, &settings.enemy.impact),
+    ];
+    let grand_champion = enemy.clone();
+    commands.insert_resource(ProjectileVisualAssets {
+        by_weapon,
+        enemy,
+        grand_champion,
+    });
 }
 
 fn sync_buffer_visuals(
     mut commands: Commands,
     assets: Res<ProjectileVisualAssets>,
+    settings: Res<GameSettings>,
     buffers: Query<
         (Entity, &ProjectileBuffer),
         Or<(With<Predicted>, With<Interpolated>, With<Replicate>)>,
@@ -107,15 +129,17 @@ fn sync_buffer_visuals(
     mut visuals: Query<(Entity, &ProjectileVisualKey, &mut Transform)>,
 ) {
     let mut live_keys = Vec::new();
+    let tint = settings.post_processing.projectile_tint;
 
     for (owner, buffer) in &buffers {
         for (slot_index, slot) in buffer.slots.iter().enumerate() {
             let ProjectileSlot::Active {
                 generation,
-                weapon,
+                source,
                 position,
                 velocity,
                 state,
+                ..
             } = slot
             else {
                 continue;
@@ -143,9 +167,17 @@ fn sync_buffer_visuals(
                 continue;
             }
 
-            let Some(visual) = assets.get(*weapon, is_impact) else {
+            let Some(visual) = assets.get(*source, is_impact) else {
                 continue;
             };
+            let mut sprite = Sprite::from_atlas_image(
+                visual.image.clone(),
+                TextureAtlas {
+                    layout: visual.layout.clone(),
+                    index: 0,
+                },
+            );
+            sprite.color = tint;
             commands.spawn((
                 key,
                 Name::new(if is_impact {
@@ -153,13 +185,7 @@ fn sync_buffer_visuals(
                 } else {
                     "Projectile Visual"
                 }),
-                Sprite::from_atlas_image(
-                    visual.image.clone(),
-                    TextureAtlas {
-                        layout: visual.layout.clone(),
-                        index: 0,
-                    },
-                ),
+                sprite,
                 SpriteAnimation {
                     last_frame: visual.frame_count.saturating_sub(1),
                     timer: Timer::from_seconds(visual.frame_seconds, TimerMode::Repeating),

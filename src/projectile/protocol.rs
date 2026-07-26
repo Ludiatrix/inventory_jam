@@ -6,7 +6,9 @@ use lightyear::prelude::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{protocol::rooms::GameRoom, settings::GameSettings};
+use crate::{projectile::spatial::SpatialHash, protocol::rooms::GameRoom, settings::GameSettings};
+
+pub const MAX_PROJECTILE_HIT_HISTORY: usize = 16;
 
 pub struct ProjectileProtocolPlugin;
 
@@ -19,10 +21,46 @@ impl Plugin for ProjectileProtocolPlugin {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProjectileSource {
+    Weapon(WeaponId),
+    Enemy,
+    GrandChampion,
+}
+
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub enum ProjectileState {
     Flying { spawn_tick: Tick },
     Impact { remaining_ticks: u16 },
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct ProjectileHitHistory {
+    ids: [u64; MAX_PROJECTILE_HIT_HISTORY],
+    count: u8,
+}
+
+impl ProjectileHitHistory {
+    pub fn contains(self, id: u64) -> bool {
+        self.ids[..self.count as usize].contains(&id)
+    }
+
+    pub fn len(self) -> usize {
+        self.count as usize
+    }
+
+    pub fn is_full(self) -> bool {
+        self.len() >= MAX_PROJECTILE_HIT_HISTORY
+    }
+
+    pub fn push(&mut self, id: u64) -> bool {
+        if self.contains(id) || self.is_full() {
+            return false;
+        }
+        self.ids[self.count as usize] = id;
+        self.count += 1;
+        true
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
@@ -32,9 +70,11 @@ pub enum ProjectileSlot {
     },
     Active {
         generation: u32,
-        weapon: WeaponId,
+        source: ProjectileSource,
         position: Vec2,
         velocity: Vec2,
+        pierce_remaining: u16,
+        hits: ProjectileHitHistory,
         state: ProjectileState,
     },
 }
@@ -47,6 +87,28 @@ pub fn overlaps(
 ) -> bool {
     let radius = projectile_radius + target_radius;
     projectile_position.distance_squared(target_position) <= radius * radius
+}
+
+pub fn projectile_stats(
+    source: ProjectileSource,
+    settings: &GameSettings,
+) -> Option<(f32, f32, f32)> {
+    match source {
+        ProjectileSource::Weapon(weapon) => settings
+            .weapons
+            .get(weapon)
+            .map(|stats| (stats.range, stats.projectile_radius, stats.projectile_speed)),
+        ProjectileSource::Enemy => Some((
+            settings.enemy.projectile_range,
+            settings.enemy.projectile_radius,
+            settings.enemy.projectile_speed,
+        )),
+        ProjectileSource::GrandChampion => Some((
+            settings.global_aristeia.grand_champion_projectile_range,
+            settings.global_aristeia.grand_champion_projectile_radius,
+            settings.global_aristeia.grand_champion_projectile_speed,
+        )),
+    }
 }
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -88,16 +150,20 @@ fn interpolate_slot(start: ProjectileSlot, end: ProjectileSlot, t: f32) -> Proje
             },
             ProjectileSlot::Active {
                 generation: end_generation,
-                weapon,
+                source,
                 position: end_position,
                 velocity,
+                pierce_remaining,
+                hits,
                 state,
             },
         ) if start_generation == end_generation => ProjectileSlot::Active {
             generation: end_generation,
-            weapon,
+            source,
             position: Vec2::lerp(start_position, end_position, t),
             velocity,
+            pierce_remaining,
+            hits,
             state,
         },
         (_, end) => end,
@@ -112,7 +178,14 @@ impl ProjectileBuffer {
         }
     }
 
-    pub fn insert(&mut self, weapon: WeaponId, position: Vec2, velocity: Vec2, spawn_tick: Tick) {
+    pub fn insert(
+        &mut self,
+        source: ProjectileSource,
+        position: Vec2,
+        velocity: Vec2,
+        pierce_remaining: u16,
+        spawn_tick: Tick,
+    ) {
         let index = (self.next_index as usize) % self.slots.len();
         let generation = match self.slots[index] {
             ProjectileSlot::Empty { generation } | ProjectileSlot::Active { generation, .. } => {
@@ -121,22 +194,26 @@ impl ProjectileBuffer {
         };
         self.slots[index] = ProjectileSlot::Active {
             generation,
-            weapon,
+            source,
             position,
             velocity,
+            pierce_remaining,
+            hits: ProjectileHitHistory::default(),
             state: ProjectileState::Flying { spawn_tick },
         };
         self.next_index = self.next_index.wrapping_add(1);
     }
 
-    /// Advance slots one fixed tick. `on_hit` returns true to convert flight into impact.
+    /// Advance slots one fixed tick.
+    /// `on_hit` applies effects when `targets` reports an overlapping entry.
     pub fn simulate(
         &mut self,
         room: &GameRoom,
         tick: Tick,
         tick_secs: f32,
         settings: &GameSettings,
-        mut on_hit: impl FnMut(WeaponId, Vec2) -> bool,
+        targets: &SpatialHash,
+        mut on_hit: impl FnMut(ProjectileSource, Vec2, u64, u16, u32, u16),
     ) {
         for i in 0..self.slots.len() {
             match &mut self.slots[i] {
@@ -154,46 +231,77 @@ impl ProjectileBuffer {
                 }
                 ProjectileSlot::Active {
                     generation,
-                    weapon,
+                    source,
                     position,
                     velocity,
+                    pierce_remaining,
+                    hits,
                     state: ProjectileState::Flying { spawn_tick },
                 } => {
                     *position += *velocity * tick_secs;
                     let generation = *generation;
-                    let weapon = *weapon;
+                    let source = *source;
                     let position = *position;
                     let velocity = *velocity;
+                    let mut pierce_remaining = *pierce_remaining;
+                    let mut hits = *hits;
                     let spawn_tick = *spawn_tick;
 
-                    let Some(stats) = settings.weapons.get(weapon) else {
+                    let Some((range, projectile_radius, _)) = projectile_stats(source, settings)
+                    else {
                         self.slots[i] = ProjectileSlot::Empty { generation };
                         continue;
                     };
                     let speed_per_tick = velocity.length() * tick_secs.max(0.001);
                     let expired = tick
-                        > spawn_tick
-                            + Tick((stats.range / speed_per_tick.max(0.001)).ceil() as u32)
+                        > spawn_tick + Tick((range / speed_per_tick.max(0.001)).ceil() as u32)
                         || !room.bounds(&settings.world).contains(position);
 
-                    self.slots[i] = if on_hit(weapon, position) {
-                        ProjectileSlot::Active {
-                            generation,
-                            weapon,
+                    let hit = targets.find_hit(room, position, projectile_radius, &hits);
+                    self.slots[i] = if let Some(hit_id) = hit {
+                        hits.push(hit_id);
+                        on_hit(
+                            source,
                             position,
-                            velocity,
-                            state: ProjectileState::Impact {
-                                remaining_ticks: settings.projectile.impact_lifetime_ticks,
-                            },
+                            hit_id,
+                            i as u16,
+                            generation,
+                            pierce_remaining,
+                        );
+                        if pierce_remaining > 0 && !hits.is_full() {
+                            pierce_remaining -= 1;
+                            ProjectileSlot::Active {
+                                generation,
+                                source,
+                                position,
+                                velocity,
+                                pierce_remaining,
+                                hits,
+                                state: ProjectileState::Flying { spawn_tick },
+                            }
+                        } else {
+                            ProjectileSlot::Active {
+                                generation,
+                                source,
+                                position,
+                                velocity,
+                                pierce_remaining: 0,
+                                hits,
+                                state: ProjectileState::Impact {
+                                    remaining_ticks: settings.projectile.impact_lifetime_ticks,
+                                },
+                            }
                         }
                     } else if expired {
                         ProjectileSlot::Empty { generation }
                     } else {
                         ProjectileSlot::Active {
                             generation,
-                            weapon,
+                            source,
                             position,
                             velocity,
+                            pierce_remaining,
+                            hits,
                             state: ProjectileState::Flying { spawn_tick },
                         }
                     };

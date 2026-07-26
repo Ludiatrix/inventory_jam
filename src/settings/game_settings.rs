@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use bevy::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::weapon::protocol::WeaponId;
 
@@ -13,9 +13,16 @@ pub(crate) struct GameSettings {
     pub enemy: EnemySettings,
     pub spawner: SpawnerSettings,
     pub fragment: FragmentSettings,
+    pub post_processing: PostProcessingSettings,
+    pub camera: CameraSettings,
+    pub hud: HudSettings,
+    pub player_visual: PlayerVisualSettings,
+    pub combat_feedback: CombatFeedbackSettings,
+    pub arena_floor: ArenaFloorSettings,
     pub player: PlayerSettings,
     pub world: WorldSettings,
-    pub portal: PortalSettings,
+    pub gate: GateSettings,
+    pub gate_visual: GateVisualSettings,
     pub server_camera: ServerCameraSettings,
     pub projectile: ProjectileSettings,
     pub weapons: WeaponsSettings,
@@ -27,6 +34,35 @@ pub(crate) struct GameSettings {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct PostProcessingSettings {
+    #[serde(deserialize_with = "deserialize_color")]
+    pub clear_color: Color,
+    pub bloom_intensity: f32,
+    pub bloom_low_frequency_boost: f32,
+    #[serde(deserialize_with = "deserialize_color")]
+    pub projectile_tint: Color,
+    #[serde(deserialize_with = "deserialize_color")]
+    pub fragment_tint: Color,
+    #[serde(deserialize_with = "deserialize_color")]
+    pub gate_tint: Color,
+    #[serde(deserialize_with = "deserialize_color")]
+    pub username_text: Color,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ArenaFloorSettings {
+    pub bands: Vec<ArenaFloorBandSettings>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ArenaFloorBandSettings {
+    #[serde(deserialize_with = "deserialize_color")]
+    pub inner_tint: Color,
+    #[serde(deserialize_with = "deserialize_color")]
+    pub outer_tint: Color,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct NetworkSettings {
     pub interest_radius: f32,
 }
@@ -34,13 +70,36 @@ pub struct NetworkSettings {
 #[derive(Debug, Clone, Deserialize)]
 pub struct EnemySettings {
     pub size: f32,
-    pub max_health: u32,
     pub collision_radius: f32,
     pub despawn_distance_from_players: f32,
-    pub move_speed: f32,
     pub wander_radius: f32,
     pub detection_radius: f32,
     pub leash_radius: f32,
+    pub standoff_distance: f32,
+    pub strafe_radius: f32,
+    pub engage_retarget_seconds: f32,
+    pub ranged_chance: f32,
+    pub attacks_per_second: f32,
+    pub projectile_speed: f32,
+    pub projectile_radius: f32,
+    pub projectile_range: f32,
+    pub projectile: WeaponSpriteSheetSettings,
+    pub impact: WeaponSpriteSheetSettings,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SpawnerTierSettings {
+    pub max_distance_from_center: f32,
+    pub spawn_rate_multiplier: f32,
+    pub max_owned_multiplier: f32,
+    pub health: u32,
+    pub contact_damage: u32,
+    pub ranged_damage: u32,
+    pub move_speed: f32,
+    pub fragment_multiplier: f32,
+    pub ranged_chance: f32,
+    pub personal_aristeia_reward: u32,
+    pub global_aristeia_reward: u32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -53,6 +112,22 @@ pub struct SpawnerSettings {
     pub placement_candidate_count: usize,
     pub spawn_min_distance_from_player: f32,
     pub spawn_candidate_count: usize,
+    pub tiers: Vec<SpawnerTierSettings>,
+}
+
+impl SpawnerSettings {
+    pub fn tier_index_for_distance(&self, distance_from_center: f32) -> u8 {
+        self.tiers
+            .iter()
+            .position(|tier| distance_from_center <= tier.max_distance_from_center)
+            .unwrap_or(self.tiers.len().saturating_sub(1)) as u8
+    }
+
+    pub fn tier(&self, index: u8) -> &SpawnerTierSettings {
+        self.tiers
+            .get(index as usize)
+            .unwrap_or_else(|| &self.tiers[self.tiers.len() - 1])
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -65,38 +140,74 @@ pub struct FragmentSettings {
     pub pull_speed: f32,
     pub pull_acceleration: f32,
     pub swirl: f32,
+    pub collecting_impact_ticks: u16,
     pub base_drop_count: u16,
     pub bonus_drops_per_aristeia: u16,
     pub maximum_drop_count: u16,
     pub drop_entity_count: u16,
+    pub on_ground: WeaponSpriteSheetSettings,
+    pub starting_pull: WeaponSpriteSheetSettings,
+    pub moving: WeaponSpriteSheetSettings,
+    pub collecting_impact: WeaponSpriteSheetSettings,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CameraSettings {
+    pub decay_rate: f32,
+    pub scale: f32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct HudSettings {
+    pub width: f32,
+    pub bar_height: f32,
+    pub inset: f32,
+    pub row_gap: f32,
+    pub padding: f32,
+    pub boss_indicator_size: f32,
+    pub boss_indicator_margin: f32,
+    pub boss_indicator_path: String,
+    #[serde(deserialize_with = "deserialize_color")]
+    pub boss_indicator_color: Color,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PlayerVisualSettings {
+    #[serde(deserialize_with = "deserialize_vec3")]
+    pub username_label_offset: Vec3,
+    pub aim_smooth_rate: f32,
+    pub health_bar_width: f32,
+    pub health_bar_height: f32,
+    pub health_bar_offset_y: f32,
+    pub held_weapon_offset: f32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CombatFeedbackSettings {
+    pub flash_duration_seconds: f32,
+    #[serde(deserialize_with = "deserialize_color")]
+    pub flash_color: Color,
+    pub popup_duration_seconds: f32,
+    pub popup_rise_speed: f32,
+    pub popup_offset_y: f32,
+    pub popup_font_size: f32,
+    #[serde(deserialize_with = "deserialize_color")]
+    pub outgoing_color: Color,
+    #[serde(deserialize_with = "deserialize_color")]
+    pub incoming_color: Color,
+    #[serde(deserialize_with = "deserialize_color")]
+    pub crit_color: Color,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct PlayerSettings {
-    pub camera_decay_rate: f32,
-    pub camera_scale: f32,
-
-    #[serde(deserialize_with = "deserialize_vec3")]
-    pub username_label_offset: Vec3,
-
-    pub aim_visual_smooth_rate: f32,
-    pub health_bar_width: f32,
-    pub health_bar_height: f32,
-    pub health_bar_offset_y: f32,
-    #[allow(unused)]
-    pub spawn_attempts: usize,
     pub maximum_health: u32,
-    pub enemy_contact_damage: u32,
     pub enemy_contact_damage_interval_seconds: f32,
     pub death_screen_duration_seconds: f32,
     pub half_size: f32,
     pub collision_radius: f32,
     pub move_speed: f32,
-    #[allow(unused)]
-    pub held_weapon_offset: f32,
-    pub aristeia_duration_ticks: u16,
-    pub aristeia_bar_width: f32,
-    pub aristeia_bar_height: f32,
+    pub arena_health_regen_fraction_per_second: f32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -110,18 +221,84 @@ pub struct WorldSettings {
     pub stream_half_width: i32,
     pub stream_half_height: i32,
     pub arena_floor_tiles: Vec<usize>,
+    pub arena_tileset: TileAtlasSettings,
+    pub safezone: SafezoneSettings,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct PortalSettings {
-    pub trigger_radius: f32,
-    pub arena_portal_count: usize,
+pub struct TileAtlasSettings {
+    pub path: String,
+    #[serde(deserialize_with = "deserialize_uvec2")]
+    pub cell: UVec2,
+    pub columns: u32,
+    pub rows: u32,
+}
+
+impl TileAtlasSettings {
+    fn is_valid(&self) -> bool {
+        !self.path.is_empty()
+            && self.cell.x > 0
+            && self.cell.y > 0
+            && self.columns > 0
+            && self.rows > 0
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SafezoneSettings {
+    #[serde(deserialize_with = "deserialize_color")]
+    pub background_color: Color,
+    pub wall_ring_thickness: i32,
+    #[serde(deserialize_with = "deserialize_uvec2")]
+    pub wall_tile: UVec2,
+    pub tileset: TileAtlasSettings,
+    pub floors: Vec<SafezoneFloorRect>,
+    pub props: Vec<SafezoneProp>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SafezoneFloorRect {
+    #[serde(deserialize_with = "deserialize_uvec2")]
+    pub center_tile: UVec2,
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SafezoneProp {
+    #[serde(deserialize_with = "deserialize_uvec2")]
+    pub tile: UVec2,
+    pub x: i32,
+    pub y: i32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GateSettings {
+    /// Radius for walking into an open gate to teleport.
+    pub teleport_radius: f32,
+    /// Radius for charging a closed arena gate / extended enemy aggro.
+    pub nearby_radius: f32,
+    pub arena_gate_count: usize,
     pub arena_edge_inset: f32,
     pub placement_attempts: usize,
     pub teleport_cooldown_ticks: u16,
+    pub open_fill_seconds: f32,
+    pub closed_decay_seconds: f32,
+    pub open_drain_seconds: f32,
+    /// Multiplier applied to enemy detection/leash when a player is within nearby_radius.
+    pub nearby_detection_multiplier: f32,
 
     #[serde(deserialize_with = "deserialize_vec2")]
-    pub safezone_portal_offset: Vec2,
+    pub safezone_gate_offset: Vec2,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GateVisualSettings {
+    pub bar_width: f32,
+    pub bar_height: f32,
+    pub bar_offset_y: f32,
 }
 
 impl WorldSettings {
@@ -223,12 +400,33 @@ impl WeaponSpriteSheetSettings {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UpgradeStatKind {
+    Damage,
+    AttackSpeed,
+    Pierce,
+    Crit,
+    Armor,
+    MaxHealth,
+}
+
+impl UpgradeStatKind {
+    pub const ALL: [Self; 6] = [
+        Self::Damage,
+        Self::AttackSpeed,
+        Self::Pierce,
+        Self::Crit,
+        Self::Armor,
+        Self::MaxHealth,
+    ];
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct WeaponStationsSettings {
     pub trigger_radius: f32,
-    #[serde(deserialize_with = "deserialize_vec2")]
-    pub upgrade_station_offset: Vec2,
     pub stations: Vec<WeaponStationSettings>,
+    pub upgrade_stations: Vec<UpgradeStationSettings>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -239,8 +437,21 @@ pub struct WeaponStationSettings {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct UpgradeStationSettings {
+    pub kind: UpgradeStatKind,
+    #[serde(deserialize_with = "deserialize_vec2")]
+    pub offset: Vec2,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct ProgressionSettings {
     pub damage_bonus_per_level: f32,
+    pub attack_speed_bonus_per_level: f32,
+    pub pierce_per_level: u16,
+    pub crit_chance_per_level: f32,
+    pub crit_damage_multiplier: f32,
+    pub armor_per_level: u32,
+    pub max_health_per_level: u32,
     pub upgrade_cost_base: u32,
     pub upgrade_cost_level_scale: u32,
     pub upgrade_cost_level_power: u32,
@@ -249,6 +460,26 @@ pub struct ProgressionSettings {
 impl ProgressionSettings {
     pub fn damage_at(&self, base_damage: u32, level: u32) -> u32 {
         (base_damage as f32 * (1.0 + self.damage_bonus_per_level * level as f32)).round() as u32
+    }
+
+    pub fn attacks_per_second_at(&self, base_aps: f32, level: u32) -> f32 {
+        base_aps * (1.0 + self.attack_speed_bonus_per_level * level as f32)
+    }
+
+    pub fn pierce_at(&self, level: u32) -> u16 {
+        self.pierce_per_level.saturating_mul(level as u16)
+    }
+
+    pub fn crit_chance_at(&self, level: u32) -> f32 {
+        (self.crit_chance_per_level * level as f32).clamp(0.0, 1.0)
+    }
+
+    pub fn armor_at(&self, level: u32) -> u32 {
+        self.armor_per_level.saturating_mul(level)
+    }
+
+    pub fn max_health_at(&self, base_health: u32, level: u32) -> u32 {
+        base_health.saturating_add(self.max_health_per_level.saturating_mul(level))
     }
 
     pub fn upgrade_cost(&self, level: u32) -> Result<u32, String> {
@@ -265,15 +496,64 @@ impl ProgressionSettings {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct BossPatternSettings {
+    pub duration_seconds: f32,
+    pub projectile_count: u16,
+    pub volley_interval_seconds: f32,
+    #[serde(default)]
+    pub spread_degrees: f32,
+    #[serde(default)]
+    pub rotation_degrees: f32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct BossPatternsSettings {
+    pub fan: BossPatternSettings,
+    pub radial: BossPatternSettings,
+    pub spiral: BossPatternSettings,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct GlobalAristeiaSettings {
     pub threshold: u32,
-    pub contribution_per_kill: u32,
     pub drain_interval_ticks: u16,
     pub drain_amount: u32,
+    pub personal_level_cost_base: f32,
+    pub personal_level_cost_scale: f32,
+    pub personal_level_cost_exponent: f32,
+    pub personal_duration_base_seconds: f32,
+    pub personal_duration_decay_per_level: f32,
+    pub personal_duration_min_seconds: f32,
     pub grand_champion_health: u32,
     pub grand_champion_move_speed: f32,
+    pub grand_champion_spawn_distance: f32,
     pub grand_champion_detection_radius: f32,
     pub grand_champion_leash_radius: f32,
+    pub grand_champion_contact_damage: u32,
+    pub grand_champion_ranged_damage: u32,
+    pub grand_champion_fragment_multiplier: f32,
+    pub grand_champion_personal_aristeia_reward: u32,
+    pub grand_champion_projectile_speed: f32,
+    pub grand_champion_projectile_radius: f32,
+    pub grand_champion_projectile_range: f32,
+    pub grand_champion_projectile_buffer_capacity: usize,
+    pub patterns: BossPatternsSettings,
+}
+
+impl GlobalAristeiaSettings {
+    pub fn personal_level_cost(&self, level: u32) -> u32 {
+        (self.personal_level_cost_base
+            + self.personal_level_cost_scale
+                * (level as f32).powf(self.personal_level_cost_exponent))
+        .ceil()
+        .max(1.0) as u32
+    }
+
+    pub fn personal_duration_seconds(&self, level: u32) -> f32 {
+        let scaled = self.personal_duration_base_seconds
+            / (1.0 + self.personal_duration_decay_per_level * level as f32);
+        scaled.max(self.personal_duration_min_seconds)
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -297,30 +577,79 @@ pub struct MobileControlsSettings {
 }
 
 impl GameSettings {
+    const SETTINGS_FILES: &[&str] = &["world.json", "player.json", "enemies.json", "graphics.json"];
+
     pub fn load(path: impl AsRef<Path>) -> Result<Self, GameSettingsLoadError> {
-        let path = path.as_ref();
+        let directory = path.as_ref();
+        let mut merged = serde_json::Map::new();
 
-        // wasm32-unknown-unknown has no filesystem, so the settings file is
-        // embedded into the binary at compile time instead of read at runtime.
-        #[cfg(target_family = "wasm")]
-        let json = include_str!("../../assets/game_settings.json").to_owned();
-
-        #[cfg(not(target_family = "wasm"))]
-        let json = fs::read_to_string(path).map_err(|source| GameSettingsLoadError::Read {
-            path: path.to_path_buf(),
-            source,
-        })?;
-
-        let settings = serde_json::from_str::<GameSettings>(&json).map_err(|source| {
-            GameSettingsLoadError::Parse {
-                path: path.to_path_buf(),
-                source,
+        for file_name in Self::SETTINGS_FILES {
+            let file_path = directory.join(file_name);
+            let json = Self::read_settings_file(&file_path, file_name)?;
+            let value = serde_json::from_str::<serde_json::Value>(&json).map_err(|source| {
+                GameSettingsLoadError::Parse {
+                    path: file_path.clone(),
+                    source,
+                }
+            })?;
+            let serde_json::Value::Object(map) = value else {
+                return Err(GameSettingsLoadError::Invalid(format!(
+                    "settings file {} must contain a JSON object",
+                    file_path.display()
+                )));
+            };
+            for (key, nested) in map {
+                if merged.insert(key.clone(), nested).is_some() {
+                    return Err(GameSettingsLoadError::Invalid(format!(
+                        "duplicate settings key '{key}' while loading {}",
+                        file_path.display()
+                    )));
+                }
             }
-        })?;
+        }
+
+        let settings = serde_json::from_value::<GameSettings>(serde_json::Value::Object(merged))
+            .map_err(|source| GameSettingsLoadError::Parse {
+                path: directory.to_path_buf(),
+                source,
+            })?;
 
         settings.validate()?;
         Ok(settings)
     }
+
+    fn read_settings_file(
+        file_path: &Path,
+        file_name: &str,
+    ) -> Result<String, GameSettingsLoadError> {
+        // wasm32-unknown-unknown has no filesystem, so settings are embedded.
+        #[cfg(target_family = "wasm")]
+        {
+            let _ = file_path;
+            let json = match file_name {
+                "world.json" => include_str!("../../assets/settings/world.json"),
+                "player.json" => include_str!("../../assets/settings/player.json"),
+                "enemies.json" => include_str!("../../assets/settings/enemies.json"),
+                "graphics.json" => include_str!("../../assets/settings/graphics.json"),
+                _ => {
+                    return Err(GameSettingsLoadError::Invalid(format!(
+                        "unknown embedded settings file {file_name}"
+                    )));
+                }
+            };
+            Ok(json.to_owned())
+        }
+
+        #[cfg(not(target_family = "wasm"))]
+        {
+            let _ = file_name;
+            fs::read_to_string(file_path).map_err(|source| GameSettingsLoadError::Read {
+                path: file_path.to_path_buf(),
+                source,
+            })
+        }
+    }
+
     fn validate(&self) -> Result<(), GameSettingsLoadError> {
         if self.network.interest_radius <= 0.0 {
             return Err(GameSettingsLoadError::Invalid(
@@ -332,14 +661,23 @@ impl GameSettings {
                 "enemy size and collision radius must be greater than zero".into(),
             ));
         }
-        if self.enemy.move_speed <= 0.0
-            || self.enemy.detection_radius <= 0.0
+        if self.enemy.detection_radius <= 0.0
             || self.enemy.despawn_distance_from_players <= 0.0
             || self.enemy.leash_radius < self.enemy.detection_radius
             || self.enemy.leash_radius < self.enemy.wander_radius
+            || self.enemy.standoff_distance < 0.0
+            || self.enemy.strafe_radius < 0.0
+            || self.enemy.engage_retarget_seconds <= 0.0
+            || !(0.0..=1.0).contains(&self.enemy.ranged_chance)
+            || self.enemy.attacks_per_second <= 0.0
+            || self.enemy.projectile_speed <= 0.0
+            || self.enemy.projectile_radius < 0.0
+            || self.enemy.projectile_range <= 0.0
+            || !self.enemy.projectile.is_valid()
+            || !self.enemy.impact.is_valid()
         {
             return Err(GameSettingsLoadError::Invalid(
-                "enemy movement settings are invalid".into(),
+                "enemy movement or attack settings are invalid".into(),
             ));
         }
         if self.spawner.count == 0
@@ -352,10 +690,29 @@ impl GameSettings {
             || self.spawner.spawn_min_distance_from_player < 0.0
             || self.enemy.despawn_distance_from_players
                 <= self.spawner.spawn_min_distance_from_player
+            || self.spawner.tiers.is_empty()
         {
             return Err(GameSettingsLoadError::Invalid(
                 "spawner settings are invalid".into(),
             ));
+        }
+        let mut previous_distance = 0.0;
+        for (index, tier) in self.spawner.tiers.iter().enumerate() {
+            if tier.max_distance_from_center < previous_distance
+                || tier.spawn_rate_multiplier <= 0.0
+                || tier.max_owned_multiplier <= 0.0
+                || tier.health == 0
+                || tier.move_speed <= 0.0
+                || tier.fragment_multiplier < 0.0
+                || !(0.0..=1.0).contains(&tier.ranged_chance)
+                || tier.personal_aristeia_reward == 0
+                || tier.global_aristeia_reward == 0
+            {
+                return Err(GameSettingsLoadError::Invalid(format!(
+                    "spawner tier {index} settings are invalid"
+                )));
+            }
+            previous_distance = tier.max_distance_from_center;
         }
         if self.fragment.pool_min_radius > self.fragment.pool_max_radius {
             return Err(GameSettingsLoadError::Invalid(
@@ -369,22 +726,62 @@ impl GameSettings {
         }
         if self.fragment.base_drop_count > self.fragment.maximum_drop_count
             || self.fragment.drop_entity_count == 0
+            || self.fragment.collecting_impact_ticks == 0
+            || !self.fragment.on_ground.is_valid()
+            || !self.fragment.starting_pull.is_valid()
+            || !self.fragment.moving.is_valid()
+            || !self.fragment.collecting_impact.is_valid()
             || self.global_aristeia.threshold == 0
             || self.global_aristeia.drain_interval_ticks == 0
+            || self.global_aristeia.personal_level_cost_base <= 0.0
+            || self.global_aristeia.personal_level_cost_scale < 0.0
+            || self.global_aristeia.personal_level_cost_exponent <= 0.0
+            || self.global_aristeia.personal_duration_base_seconds <= 0.0
+            || self.global_aristeia.personal_duration_decay_per_level < 0.0
+            || self.global_aristeia.personal_duration_min_seconds <= 0.0
+            || self.global_aristeia.personal_duration_min_seconds
+                > self.global_aristeia.personal_duration_base_seconds
         {
             return Err(GameSettingsLoadError::Invalid(
-                "fragment drop or global Aristeia settings are invalid".into(),
+                "fragment drop, visual, or global Aristeia settings are invalid".into(),
             ));
         }
-        if self.progression.damage_bonus_per_level < 0.0 {
+        if self.progression.damage_bonus_per_level < 0.0
+            || self.progression.attack_speed_bonus_per_level < 0.0
+            || self.progression.crit_chance_per_level < 0.0
+            || self.progression.crit_damage_multiplier < 1.0
+        {
             return Err(GameSettingsLoadError::Invalid(
-                "progression damage_bonus_per_level cannot be negative".into(),
+                "progression damage/attack-speed/crit settings are invalid".into(),
             ));
         }
         if self.progression.upgrade_cost_base == 0 || self.progression.upgrade_cost_level_scale == 0
         {
             return Err(GameSettingsLoadError::Invalid(
                 "progression upgrade cost coefficients must be greater than zero".into(),
+            ));
+        }
+        if self.global_aristeia.grand_champion_health == 0
+            || self.global_aristeia.grand_champion_move_speed <= 0.0
+            || self.global_aristeia.grand_champion_spawn_distance <= 0.0
+            || self.global_aristeia.grand_champion_detection_radius <= 0.0
+            || self.global_aristeia.grand_champion_leash_radius
+                < self.global_aristeia.grand_champion_detection_radius
+            || self.global_aristeia.grand_champion_fragment_multiplier < 0.0
+            || self.global_aristeia.grand_champion_personal_aristeia_reward == 0
+            || self.global_aristeia.grand_champion_projectile_speed <= 0.0
+            || self.global_aristeia.grand_champion_projectile_radius < 0.0
+            || self.global_aristeia.grand_champion_projectile_range <= 0.0
+            || self
+                .global_aristeia
+                .grand_champion_projectile_buffer_capacity
+                == 0
+            || !boss_pattern_valid(&self.global_aristeia.patterns.fan)
+            || !boss_pattern_valid(&self.global_aristeia.patterns.radial)
+            || !boss_pattern_valid(&self.global_aristeia.patterns.spiral)
+        {
+            return Err(GameSettingsLoadError::Invalid(
+                "global Aristeia champion settings are invalid".into(),
             ));
         }
         if self.world.tile_pixel_size <= 0.0
@@ -402,22 +799,104 @@ impl GameSettings {
                 "world arena_floor_tiles cannot be empty".into(),
             ));
         }
-        if self.player.camera_scale <= 0.0
-            || self.player.maximum_health == 0
-            || self.player.death_screen_duration_seconds <= 0.0
-        {
+        if !self.world.arena_tileset.is_valid() || !self.world.safezone.tileset.is_valid() {
             return Err(GameSettingsLoadError::Invalid(
-                "player camera_scale, maximum_health, and death_screen_duration_seconds must be greater than zero".into(),
+                "world arena/safezone tileset settings are invalid".into(),
             ));
         }
-        if self.portal.trigger_radius <= 0.0
-            || self.portal.arena_portal_count == 0
-            || self.portal.arena_edge_inset < 0.0
-            || self.portal.placement_attempts == 0
-            || self.portal.teleport_cooldown_ticks == 0
+        if self.world.safezone.wall_ring_thickness < 0 {
+            return Err(GameSettingsLoadError::Invalid(
+                "safezone wall_ring_thickness cannot be negative".into(),
+            ));
+        }
+        for (index, floor) in self.world.safezone.floors.iter().enumerate() {
+            if floor.width <= 0 || floor.height <= 0 {
+                return Err(GameSettingsLoadError::Invalid(format!(
+                    "safezone floor {index} width and height must be greater than zero"
+                )));
+            }
+        }
+        if self.post_processing.bloom_intensity < 0.0
+            || self.post_processing.bloom_low_frequency_boost < 0.0
         {
             return Err(GameSettingsLoadError::Invalid(
-                "portal settings are invalid".into(),
+                "post_processing bloom_intensity and bloom_low_frequency_boost cannot be negative"
+                    .into(),
+            ));
+        }
+        if self.camera.scale <= 0.0 || self.camera.decay_rate < 0.0 {
+            return Err(GameSettingsLoadError::Invalid(
+                "camera scale must be greater than zero and decay_rate cannot be negative".into(),
+            ));
+        }
+        if self.arena_floor.bands.len() != self.spawner.tiers.len() {
+            return Err(GameSettingsLoadError::Invalid(format!(
+                "arena_floor bands ({}) must match spawner tiers ({})",
+                self.arena_floor.bands.len(),
+                self.spawner.tiers.len()
+            )));
+        }
+        if self.hud.width <= 0.0
+            || self.hud.bar_height <= 0.0
+            || self.hud.inset < 0.0
+            || self.hud.row_gap < 0.0
+            || self.hud.padding < 0.0
+            || self.hud.boss_indicator_size <= 0.0
+            || self.hud.boss_indicator_margin < 0.0
+            || self.hud.boss_indicator_path.is_empty()
+        {
+            return Err(GameSettingsLoadError::Invalid(
+                "hud layout settings are invalid".into(),
+            ));
+        }
+        if self.player_visual.aim_smooth_rate < 0.0
+            || self.player_visual.health_bar_width <= 0.0
+            || self.player_visual.health_bar_height <= 0.0
+            || self.player_visual.held_weapon_offset < 0.0
+        {
+            return Err(GameSettingsLoadError::Invalid(
+                "player_visual settings are invalid".into(),
+            ));
+        }
+        if self.combat_feedback.flash_duration_seconds <= 0.0
+            || self.combat_feedback.popup_duration_seconds <= 0.0
+            || self.combat_feedback.popup_rise_speed < 0.0
+            || self.combat_feedback.popup_font_size <= 0.0
+        {
+            return Err(GameSettingsLoadError::Invalid(
+                "combat_feedback settings are invalid".into(),
+            ));
+        }
+        if self.player.maximum_health == 0
+            || self.player.death_screen_duration_seconds <= 0.0
+            || self.player.enemy_contact_damage_interval_seconds <= 0.0
+            || self.player.arena_health_regen_fraction_per_second < 0.0
+            || self.player.half_size <= 0.0
+            || self.player.collision_radius <= 0.0
+            || self.player.move_speed <= 0.0
+        {
+            return Err(GameSettingsLoadError::Invalid(
+                "player gameplay settings are invalid".into(),
+            ));
+        }
+        if self.gate.teleport_radius <= 0.0
+            || self.gate.nearby_radius <= 0.0
+            || self.gate.arena_gate_count == 0
+            || self.gate.arena_edge_inset < 0.0
+            || self.gate.placement_attempts == 0
+            || self.gate.teleport_cooldown_ticks == 0
+            || self.gate.open_fill_seconds <= 0.0
+            || self.gate.closed_decay_seconds <= 0.0
+            || self.gate.open_drain_seconds <= 0.0
+            || self.gate.nearby_detection_multiplier < 1.0
+        {
+            return Err(GameSettingsLoadError::Invalid(
+                "gate settings are invalid".into(),
+            ));
+        }
+        if self.gate_visual.bar_width <= 0.0 || self.gate_visual.bar_height <= 0.0 {
+            return Err(GameSettingsLoadError::Invalid(
+                "gate_visual bar dimensions must be greater than zero".into(),
             ));
         }
         if self.server_camera.min_scale <= 0.0
@@ -477,6 +956,11 @@ impl GameSettings {
                     station.weapon_id
                 )));
             }
+        }
+        if self.weapon_stations.upgrade_stations.is_empty() {
+            return Err(GameSettingsLoadError::Invalid(
+                "weapon stations must include at least one upgrade station".into(),
+            ));
         }
         Ok(())
     }
@@ -551,4 +1035,10 @@ where
 {
     let [red, green, blue] = <[f32; 3]>::deserialize(deserializer)?;
     Ok(Color::srgb(red, green, blue))
+}
+
+fn boss_pattern_valid(pattern: &BossPatternSettings) -> bool {
+    pattern.duration_seconds > 0.0
+        && pattern.projectile_count > 0
+        && pattern.volley_interval_seconds > 0.0
 }

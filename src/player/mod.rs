@@ -7,7 +7,7 @@ pub mod protocol;
 mod render;
 
 #[cfg(feature = "server")]
-mod server;
+pub(crate) mod server;
 
 pub mod shared;
 
@@ -25,7 +25,7 @@ impl Plugin for PlayerPlugin {
         app.add_plugins(protocol::PlayerProtocolPlugin);
 
         #[cfg(feature = "server")]
-        app.add_message::<api::AddKillsToAristeia>();
+        app.add_message::<api::AddAristeiaPoints>();
 
         #[cfg(feature = "client")]
         app.add_plugins(client::PlayerClientPlugin);

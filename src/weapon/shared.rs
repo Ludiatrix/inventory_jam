@@ -27,13 +27,11 @@ pub(crate) fn fire_equipped_weapons(
         &mut WeaponCooldown,
         &mut ProjectileBuffer,
     )>,
-    host_server: Query<(), With<lightyear::connection::host::HostServer>>,
     app_state: Option<Res<State<ServerState>>>,
     local_timeline: Res<LocalTimeline>,
     tick_duration: Res<TickDuration>,
     settings: Res<GameSettings>,
 ) {
-    let host_server = !host_server.is_empty();
     let authoritative = app_state
         .as_ref()
         .is_some_and(|state| matches!(state.get(), ServerState::Hosting));
@@ -49,7 +47,7 @@ pub(crate) fn fire_equipped_weapons(
         mut buffer,
     ) in &mut players
     {
-        if (host_server && predicted) || !(authoritative || predicted) {
+        if !(authoritative || predicted) {
             continue;
         }
         if health.current == 0
@@ -79,11 +77,18 @@ pub(crate) fn fire_equipped_weapons(
                     + settings.projectile.spawn_gap);
 
         buffer.insert(
-            weapon_id,
+            crate::projectile::protocol::ProjectileSource::Weapon(weapon_id),
             position,
             direction * weapon.projectile_speed,
+            settings
+                .progression
+                .pierce_at(cache.weapon(weapon_id).pierce_level),
             local_timeline.tick(),
         );
-        cooldown.restart(&local_timeline, &tick_duration, weapon.attacks_per_second);
+        let attacks_per_second = settings.progression.attacks_per_second_at(
+            weapon.attacks_per_second,
+            cache.weapon(weapon_id).attack_speed_level,
+        );
+        cooldown.restart(&local_timeline, &tick_duration, attacks_per_second);
     }
 }

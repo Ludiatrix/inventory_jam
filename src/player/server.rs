@@ -1,22 +1,29 @@
 use crate::app::ServerState;
-use crate::enemy::{EnemyHealth, EnemyKind, EnemyPosition};
+use crate::combat::HitFlash;
+use crate::enemy::{EnemyHealth, EnemyIdentity, EnemyPosition};
+use crate::gate::GateTeleportCooldown;
+use crate::persistence::{CachedPersistentState, PersistenceReady, Transaction};
 use crate::player::PlayerId;
-use crate::player::api::AddKillsToAristeia;
+use crate::player::api::AddAristeiaPoints;
 use crate::player::protocol::{
-    PlayerAimDirection, PlayerAristeia, PlayerBundle, PlayerHealth, PlayerPosition, PlayerVisual,
+    PlayerAimDirection, PlayerAristeia, PlayerBundle, PlayerHealth, PlayerPosition, PlayerUsername,
+    PlayerVisual,
 };
-use crate::player::shared::{apply_player_aim, apply_player_movement};
-use crate::portal::PortalTeleportCooldown;
+use crate::player::shared::{
+    apply_damage_to_player, apply_player_aim, apply_player_movement, armor_from_cache,
+};
 use crate::protocol::inputs::PlayerAction;
 use crate::protocol::rooms::{GameRoom, GameRooms};
 use crate::settings::GameSettings;
 use crate::shared::FixedGameplaySet;
 use bevy::prelude::*;
+#[cfg(feature = "gui")]
 use bevy::window::PrimaryWindow;
 use leafwing_input_manager::prelude::*;
 use lightyear::connection::client::Connected;
 use lightyear::connection::client_of::ClientOf;
 use lightyear::prelude::*;
+use rand::Rng;
 
 #[derive(Component, Clone, Copy, Debug, Default)]
 struct EnemyContactDamageCooldown {
@@ -24,8 +31,13 @@ struct EnemyContactDamageCooldown {
 }
 
 #[derive(Component, Clone, Copy, Debug, Default)]
-struct PlayerDeathTimer {
-    remaining_seconds: f32,
+pub(crate) struct PlayerDeathTimer {
+    pub(crate) remaining_seconds: f32,
+}
+
+#[derive(Component, Clone, Copy, Debug, Default)]
+struct ArenaHealthRegenAccumulator {
+    remaining: f32,
 }
 
 pub struct PlayerServerPlugin;
@@ -40,13 +52,22 @@ impl Plugin for PlayerServerPlugin {
                 authoritative_player_movement,
                 authoritative_player_aim,
                 add_requested_aristeia,
+                sync_equipped_max_health,
                 restore_safezone_health,
+                regenerate_arena_health,
                 apply_enemy_contact_damage,
                 tick_player_death,
-                control_dedicated_server_camera,
                 tick_player_aristeia,
             )
                 .chain()
+                .in_set(FixedGameplaySet::Player)
+                .run_if(in_state(ServerState::Hosting)),
+        );
+
+        #[cfg(feature = "gui")]
+        app.add_systems(
+            FixedUpdate,
+            control_dedicated_server_camera
                 .in_set(FixedGameplaySet::Player)
                 .run_if(in_state(ServerState::Hosting)),
         );
@@ -55,45 +76,73 @@ impl Plugin for PlayerServerPlugin {
 
 pub(crate) fn add_requested_aristeia(
     settings: Res<GameSettings>,
-    mut requests: MessageReader<AddKillsToAristeia>,
+    mut requests: MessageReader<AddAristeiaPoints>,
     mut players: Query<(&PlayerId, &mut PlayerAristeia)>,
 ) {
-    for AddKillsToAristeia(owner_id, number_of_kills) in requests.read() {
+    for AddAristeiaPoints(owner_id, points) in requests.read() {
         let Some(mut aristeia) = players
             .iter_mut()
             .find_map(|(player_id, aristeia)| (player_id.0 == *owner_id).then_some(aristeia))
         else {
-            warn!(
-                ?owner_id,
-                number_of_kills, "No player matched the Aristeia award"
-            );
+            warn!(?owner_id, points, "No player matched the Aristeia award");
             continue;
         };
 
-        aristeia.current = aristeia.current.saturating_add(u32::from(*number_of_kills));
+        aristeia.progress = aristeia.progress.saturating_add(*points);
+        loop {
+            let cost = settings
+                .global_aristeia
+                .personal_level_cost(aristeia.current);
+            if aristeia.progress < cost {
+                break;
+            }
+            aristeia.progress -= cost;
+            aristeia.current = aristeia.current.saturating_add(1);
+        }
 
-        aristeia.maximum_ticks = settings.player.aristeia_duration_ticks;
-
-        aristeia.remaining_ticks = settings.player.aristeia_duration_ticks;
+        let duration = settings
+            .global_aristeia
+            .personal_duration_seconds(aristeia.current);
+        aristeia.maximum_seconds = duration;
+        aristeia.remaining_seconds = duration;
     }
 }
 
-fn tick_player_aristeia(mut players: Query<&mut PlayerAristeia>) {
-    for mut aristeia in &mut players {
-        if aristeia.current == 0 {
-            aristeia.remaining_ticks = 0;
+fn tick_player_aristeia(
+    time: Res<Time>,
+    settings: Res<GameSettings>,
+    mut players: Query<(&GameRoom, &mut PlayerAristeia)>,
+) {
+    let dt = time.delta_secs();
+    for (room, mut aristeia) in &mut players {
+        if room.room == GameRooms::Safezone {
+            *aristeia = PlayerAristeia::default();
             continue;
         }
 
-        if aristeia.remaining_ticks > 0 {
-            aristeia.remaining_ticks -= 1;
+        if aristeia.current == 0 && aristeia.progress == 0 {
+            aristeia.remaining_seconds = 0.0;
             continue;
         }
 
-        aristeia.current = aristeia.current.saturating_sub(1);
+        if aristeia.remaining_seconds > 0.0 {
+            aristeia.remaining_seconds = (aristeia.remaining_seconds - dt).max(0.0);
+            if aristeia.remaining_seconds > 0.0 {
+                continue;
+            }
+        }
 
         if aristeia.current > 0 {
-            aristeia.remaining_ticks = aristeia.maximum_ticks;
+            aristeia.current -= 1;
+            aristeia.progress = 0;
+            let duration = settings
+                .global_aristeia
+                .personal_duration_seconds(aristeia.current);
+            aristeia.maximum_seconds = duration;
+            aristeia.remaining_seconds = if aristeia.current > 0 { duration } else { 0.0 };
+        } else {
+            aristeia.progress = 0;
+            aristeia.remaining_seconds = 0.0;
         }
     }
 }
@@ -118,14 +167,14 @@ pub(crate) fn handle_connected(
                 client_id,
                 spawn_position,
                 settings.player.maximum_health,
-                settings.player.aristeia_duration_ticks,
                 settings.projectile.buffer_capacity,
             ),
             PlayerVisual,
             EnemyContactDamageCooldown::default(),
             PlayerDeathTimer::default(),
-            PortalTeleportCooldown {
-                remaining_ticks: settings.portal.teleport_cooldown_ticks,
+            ArenaHealthRegenAccumulator::default(),
+            GateTeleportCooldown {
+                remaining_ticks: settings.gate.teleport_cooldown_ticks,
             },
             ActionState::<PlayerAction>::default(),
             Replicate::to_clients(NetworkTarget::All),
@@ -150,7 +199,6 @@ pub(crate) fn authoritative_player_movement(
     settings: Res<GameSettings>,
     mut players: Query<
         (
-            Has<Predicted>,
             &mut PlayerPosition,
             &GameRoom,
             &PlayerHealth,
@@ -158,38 +206,42 @@ pub(crate) fn authoritative_player_movement(
         ),
         With<PlayerId>,
     >,
-    host_server: Query<(), With<lightyear::connection::host::HostServer>>,
 ) {
-    let skip_predicted = !host_server.is_empty();
-
-    for (predicted, mut position, room, health, actions) in &mut players {
-        if skip_predicted && predicted {
-            continue;
-        }
-
+    for (mut position, room, health, actions) in &mut players {
         apply_player_movement(&mut position, room, health, actions, &settings);
     }
 }
 
 pub(crate) fn authoritative_player_aim(
-    mut players: Query<
-        (
-            Has<Predicted>,
-            &ActionState<PlayerAction>,
-            &mut PlayerAimDirection,
-        ),
-        With<PlayerId>,
-    >,
-    host_server: Query<(), With<lightyear::connection::host::HostServer>>,
+    mut players: Query<(&ActionState<PlayerAction>, &mut PlayerAimDirection), With<PlayerId>>,
 ) {
-    let skip_predicted = !host_server.is_empty();
+    for (actions, mut aim_direction) in &mut players {
+        apply_player_aim(&mut aim_direction, actions);
+    }
+}
 
-    for (predicted, actions, mut aim_direction) in &mut players {
-        if skip_predicted && predicted {
+fn sync_equipped_max_health(
+    settings: Res<GameSettings>,
+    mut players: Query<
+        (&CachedPersistentState, &mut PlayerHealth),
+        (With<ControlledBy>, With<PersistenceReady>),
+    >,
+) {
+    for (cache, mut health) in &mut players {
+        let progress = cache.weapon(cache.equipped_weapon_id);
+        let maximum = settings
+            .progression
+            .max_health_at(settings.player.maximum_health, progress.max_health_level);
+        if health.maximum == maximum {
             continue;
         }
-
-        apply_player_aim(&mut aim_direction, actions);
+        let was_full = health.current == health.maximum;
+        health.maximum = maximum;
+        health.current = if was_full {
+            maximum
+        } else {
+            health.current.min(maximum)
+        };
     }
 }
 
@@ -204,24 +256,72 @@ fn restore_safezone_health(mut players: Query<(&GameRoom, &mut PlayerHealth), Wi
     }
 }
 
+fn regenerate_arena_health(
+    time: Res<Time>,
+    settings: Res<GameSettings>,
+    mut players: Query<
+        (
+            &GameRoom,
+            &mut PlayerHealth,
+            &mut ArenaHealthRegenAccumulator,
+        ),
+        With<ControlledBy>,
+    >,
+) {
+    let regen_rate = settings.player.arena_health_regen_fraction_per_second;
+    if regen_rate <= 0.0 {
+        return;
+    }
+
+    for (room, mut health, mut accumulator) in &mut players {
+        if room.room != GameRooms::Arena || health.current == 0 || health.current >= health.maximum
+        {
+            accumulator.remaining = 0.0;
+            continue;
+        }
+
+        accumulator.remaining += health.maximum as f32 * regen_rate * time.delta_secs();
+        let heal = accumulator.remaining.floor() as u32;
+        if heal == 0 {
+            continue;
+        }
+        accumulator.remaining -= heal as f32;
+        health.current = (health.current + heal).min(health.maximum);
+    }
+}
+
 fn apply_enemy_contact_damage(
     time: Res<Time>,
     mut players: Query<
         (
-            Entity,
             &PlayerPosition,
             &GameRoom,
             &mut PlayerHealth,
+            &mut HitFlash,
             &mut EnemyContactDamageCooldown,
             &mut PlayerDeathTimer,
+            Option<&CachedPersistentState>,
+            Option<&PlayerUsername>,
+            Has<PersistenceReady>,
         ),
         With<ControlledBy>,
     >,
-    enemies: Query<(&EnemyPosition, &EnemyHealth, &EnemyKind)>,
+    enemies: Query<(&EnemyPosition, &EnemyHealth, &EnemyIdentity)>,
     settings: Res<GameSettings>,
+    mut transactions: MessageWriter<Transaction>,
 ) {
-    for (player_entity, player_position, room, mut health, mut cooldown, mut death_timer) in
-        &mut players
+    let mut rng = rand::rng();
+    for (
+        player_position,
+        room,
+        mut health,
+        mut flash,
+        mut cooldown,
+        mut death_timer,
+        cache,
+        username,
+        persistence_ready,
+    ) in &mut players
     {
         cooldown.remaining_seconds = (cooldown.remaining_seconds - time.delta_secs()).max(0.0);
 
@@ -230,38 +330,71 @@ fn apply_enemy_contact_damage(
             continue;
         }
 
-        let touching_enemy = enemies.iter().any(|(enemy_position, enemy_health, kind)| {
-            if enemy_health.current == 0 {
-                return false;
-            }
+        let Some(raw_damage) =
+            enemies
+                .iter()
+                .find_map(|(enemy_position, enemy_health, identity)| {
+                    let contact_damage = identity.stats(&settings).contact_damage;
+                    if enemy_health.current == 0 || contact_damage == 0 {
+                        return None;
+                    }
 
-            let collision_radius = settings.player.collision_radius
-                + kind.collision_radius(settings.enemy.collision_radius);
-            player_position.0.distance_squared(enemy_position.0)
-                <= collision_radius * collision_radius
-        });
-
-        if !touching_enemy {
+                    let collision_radius = settings.player.collision_radius
+                        + identity.kind.scale(settings.enemy.collision_radius);
+                    (player_position.0.distance_squared(enemy_position.0)
+                        <= collision_radius * collision_radius)
+                        .then_some(contact_damage)
+                })
+        else {
             continue;
+        };
+
+        let armor = armor_from_cache(&settings, cache);
+        if apply_damage_to_player(&mut health, raw_damage, armor, &mut rng) > 0 {
+            flash.trigger();
         }
-
-        health.current = health
-            .current
-            .saturating_sub(settings.player.enemy_contact_damage);
         cooldown.remaining_seconds = settings.player.enemy_contact_damage_interval_seconds;
-
-        info!(
-            ?player_entity,
-            damage = settings.player.enemy_contact_damage,
-            current_health = health.current,
-            maximum_health = health.maximum,
-            "Player took enemy contact damage"
-        );
 
         if health.current == 0 {
             death_timer.remaining_seconds = settings.player.death_screen_duration_seconds;
-            info!(?player_entity, "Player died");
+            apply_death_penalty(
+                &mut transactions,
+                &settings,
+                cache,
+                username,
+                persistence_ready,
+                &mut rng,
+            );
         }
+    }
+}
+
+pub(crate) fn apply_death_penalty(
+    transactions: &mut MessageWriter<Transaction>,
+    settings: &GameSettings,
+    cache: Option<&CachedPersistentState>,
+    username: Option<&PlayerUsername>,
+    persistence_ready: bool,
+    rng: &mut impl Rng,
+) {
+    if !persistence_ready {
+        return;
+    }
+    let Some(cache) = cache else {
+        return;
+    };
+    let Some(username) = username else {
+        return;
+    };
+    let progress = cache.weapon(cache.equipped_weapon_id);
+    if let Some(transaction) = Transaction::death_penalty(
+        username.0.clone(),
+        cache.equipped_weapon_id,
+        &progress,
+        &settings.progression,
+        rng,
+    ) {
+        transactions.write(transaction);
     }
 }
 
@@ -270,21 +403,18 @@ fn tick_player_death(
     settings: Res<GameSettings>,
     mut players: Query<
         (
-            Entity,
             &mut PlayerPosition,
             &mut GameRoom,
             &mut PlayerHealth,
             &mut PlayerDeathTimer,
-            &mut PortalTeleportCooldown,
+            &mut GateTeleportCooldown,
         ),
         With<ControlledBy>,
     >,
 ) {
     let safezone_center = settings.world.safezone_bounds().center();
 
-    for (player_entity, mut position, mut room, mut health, mut death_timer, mut portal_cooldown) in
-        &mut players
-    {
+    for (mut position, mut room, mut health, mut death_timer, mut gate_cooldown) in &mut players {
         if health.current > 0 || death_timer.remaining_seconds <= 0.0 {
             continue;
         }
@@ -298,11 +428,11 @@ fn tick_player_death(
         health.current = health.maximum;
         room.room = GameRooms::Safezone;
         position.0 = safezone_center;
-        portal_cooldown.remaining_ticks = settings.portal.teleport_cooldown_ticks;
-        info!(?player_entity, "Player respawned in the pit");
+        gate_cooldown.remaining_ticks = settings.gate.teleport_cooldown_ticks;
     }
 }
 
+#[cfg(feature = "gui")]
 fn control_dedicated_server_camera(
     keyboard: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,

@@ -6,7 +6,9 @@ mod server;
 
 use bevy::app::{App, Plugin};
 
-pub use protocol::{StationPosition, UpgradeStation, WeaponStationId};
+use crate::settings::UpgradeStatKind;
+
+pub use protocol::{StationPosition, UpgradeStationKind, WeaponStationId};
 
 pub struct WeaponStationPlugin;
 
@@ -20,4 +22,16 @@ impl Plugin for WeaponStationPlugin {
         #[cfg(feature = "gui")]
         app.add_plugins(render::WeaponStationRenderPlugin);
     }
+}
+
+pub(crate) fn upgrade_station_label(kind: UpgradeStatKind, level: u32, cost: u32) -> String {
+    let name = match kind {
+        UpgradeStatKind::Damage => "Damage",
+        UpgradeStatKind::AttackSpeed => "Atk Spd",
+        UpgradeStatKind::Pierce => "Pierce",
+        UpgradeStatKind::Crit => "Crit",
+        UpgradeStatKind::Armor => "Armor",
+        UpgradeStatKind::MaxHealth => "Max HP",
+    };
+    format!("{name} Lv{level}\nUpgrade: {cost}")
 }

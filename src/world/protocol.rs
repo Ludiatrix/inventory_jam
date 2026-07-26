@@ -14,6 +14,7 @@ impl Plugin for WorldProtocolPlugin {
 pub struct GlobalAristeia {
     pub current: u32,
     pub maximum: u32,
+    pub boss_active: bool,
 }
 
 impl GlobalAristeia {
@@ -21,10 +22,10 @@ impl GlobalAristeia {
         Self {
             current: 0,
             maximum,
+            boss_active: false,
         }
     }
 
-    #[allow(unused)]
     pub fn fraction(&self) -> f32 {
         if self.maximum == 0 {
             0.0
