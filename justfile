@@ -5,18 +5,18 @@ set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 [unix]
 dev n="2":
     cargo build
-    cargo run -- --mode server &
+    cargo run --bin inventory_jam -- --mode server &
     sleep 1
     for i in $(seq 1 {{n}}); do \
-        cargo run -- --mode local --user "Player$i" & \
+        cargo run --bin inventory_jam -- --mode local --user "Player$i" & \
     done
 
 [windows]
 dev n="2":
     cargo build
-    Start-Process -NoNewWindow cargo -ArgumentList @('run','--','--mode','server')
+    Start-Process -NoNewWindow cargo -ArgumentList @('run','--bin','inventory_jam','--','--mode','server')
     Start-Sleep -Seconds 1
-    1..{{n}} | ForEach-Object { Start-Process -NoNewWindow cargo -ArgumentList @('run','--','--mode','local','--user',"Player$_") }
+    1..{{n}} | ForEach-Object { Start-Process -NoNewWindow cargo -ArgumentList @('run','--bin','inventory_jam','--','--mode','local','--user',"Player$_") }
 
 # Check the project builds cleanly under every client/server/gui combo
 [unix]

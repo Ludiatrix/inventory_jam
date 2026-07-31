@@ -31,7 +31,7 @@
             "label": "Run Host",
             "type": "cargo",
             "command": "run",
-            "args": ["--", "--mode", "server"],
+            "args": ["--bin", "inventory_jam", "--", "--mode", "server"],
             "env": {
                 // "RUST_LOG": "lightyear_prediction=debug"
             },
@@ -47,7 +47,7 @@
             "label": "Run Client Player1",
             "type": "cargo",
             "command": "run",
-            "args": ["--", "--mode", "local", "--user", "Player1"],
+            "args": ["--bin", "inventory_jam", "--", "--mode", "local", "--user", "Player1"],
             "env": {
                 // "RUST_LOG": "lightyear_prediction=debug"
             },
@@ -63,7 +63,7 @@
             "label": "Run Client Player2",
             "type": "cargo",
             "command": "run",
-            "args": ["--", "--mode", "local", "--user", "Player2"],
+            "args": ["--bin", "inventory_jam", "--", "--mode", "local", "--user", "Player2"],
             "env": {
                 // "RUST_LOG": "lightyear_prediction=debug"
             },
