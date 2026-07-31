@@ -12,7 +12,7 @@ use crate::{
     shared::FixedGameplaySet,
 };
 
-pub(crate) struct InterestPlugin;
+pub struct InterestPlugin;
 
 impl Plugin for InterestPlugin {
     fn build(&self, app: &mut App) {

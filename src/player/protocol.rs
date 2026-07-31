@@ -38,7 +38,7 @@ impl Plugin for PlayerProtocolPlugin {
 
 #[cfg(feature = "server")]
 #[derive(Bundle)]
-pub(crate) struct PlayerBundle {
+pub struct PlayerBundle {
     id: PlayerId,
     position: PlayerPosition,
     color: PlayerColor,
@@ -53,7 +53,7 @@ pub(crate) struct PlayerBundle {
 
 #[cfg(feature = "server")]
 impl PlayerBundle {
-    pub(crate) fn new(
+    pub fn new(
         id: PeerId,
         position: Vec2,
         maximum_health: u32,
@@ -106,13 +106,13 @@ impl Default for PlayerAimDirection {
 }
 
 #[derive(Component, Deserialize, Serialize, Clone, Debug, PartialEq)]
-pub struct PlayerColor(pub(crate) Color);
+pub struct PlayerColor(pub Color);
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq, Deref)]
 pub struct PlayerUsername(pub String);
 
 #[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct PlayerHealth {
+pub struct PlayerHealth {
     pub current: u32,
     pub maximum: u32,
 }
@@ -127,7 +127,7 @@ impl PlayerHealth {
 }
 
 #[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Default)]
-pub(crate) struct PlayerAristeia {
+pub struct PlayerAristeia {
     pub current: u32,
     pub progress: u32,
     pub remaining_seconds: f32,
@@ -145,10 +145,10 @@ impl PlayerAristeia {
 }
 
 #[derive(Component, Clone, Copy, Debug, Default)]
-pub(crate) struct PlayerVisual;
+pub struct PlayerVisual;
 
 #[derive(Resource, Clone, Copy, Debug)]
-pub(crate) struct LocalAimInput(pub Vec2);
+pub struct LocalAimInput(pub Vec2);
 
 impl Default for LocalAimInput {
     fn default() -> Self {
@@ -157,7 +157,7 @@ impl Default for LocalAimInput {
 }
 
 #[derive(Component, Clone, Copy, Debug)]
-pub(crate) struct SmoothedAimDirection(pub Vec2);
+pub struct SmoothedAimDirection(pub Vec2);
 
 impl Default for SmoothedAimDirection {
     fn default() -> Self {

@@ -9,7 +9,7 @@ pub mod protocol;
 mod render;
 
 #[cfg(feature = "server")]
-pub(crate) mod server;
+pub mod server;
 
 pub mod shared;
 

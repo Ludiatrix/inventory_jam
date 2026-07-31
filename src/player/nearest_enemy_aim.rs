@@ -7,7 +7,7 @@ use crate::protocol::inputs::PlayerAction;
 use crate::protocol::rooms::GameRoom;
 use crate::settings::GameSettings;
 
-pub(crate) fn aim_and_fire_nearest_enemy(
+pub fn aim_and_fire_nearest_enemy(
     actions: &mut ActionState<PlayerAction>,
     player_position: Vec2,
     player_room: &GameRoom,

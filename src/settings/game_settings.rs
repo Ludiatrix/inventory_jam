@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::weapon::protocol::WeaponId;
 
 #[derive(Resource, Debug, Clone, Deserialize)]
-pub(crate) struct GameSettings {
+pub struct GameSettings {
     pub network: NetworkSettings,
     pub enemy: EnemySettings,
     pub spawner: SpawnerSettings,

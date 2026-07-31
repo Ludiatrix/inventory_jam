@@ -18,7 +18,7 @@ pub enum ServerState {
 }
 
 #[cfg(all(feature = "client", feature = "server"))]
-pub(crate) fn game_is_active(
+pub fn game_is_active(
     client_state: Res<State<ClientState>>,
     server_state: Res<State<ServerState>>,
 ) -> bool {
@@ -27,12 +27,12 @@ pub(crate) fn game_is_active(
 }
 
 #[cfg(all(feature = "client", not(feature = "server")))]
-pub(crate) fn game_is_active(client_state: Res<State<ClientState>>) -> bool {
+pub fn game_is_active(client_state: Res<State<ClientState>>) -> bool {
     matches!(client_state.get(), ClientState::Playing)
 }
 
 #[cfg(all(feature = "server", not(feature = "client")))]
-pub(crate) fn game_is_active(server_state: Res<State<ServerState>>) -> bool {
+pub fn game_is_active(server_state: Res<State<ServerState>>) -> bool {
     matches!(server_state.get(), ServerState::Hosting)
 }
 
@@ -75,7 +75,7 @@ fn start_configured_game(config: Res<LaunchConfig>, mut starts: MessageWriter<St
     }
 }
 
-pub(crate) fn config_from_env() -> LaunchConfig {
+pub fn config_from_env() -> LaunchConfig {
     #[cfg(target_family = "wasm")]
     let config = LaunchConfig {
         username: String::new(),

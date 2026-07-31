@@ -18,7 +18,7 @@ use super::worker::{FlushResult, PersistenceChannels, PersistenceResponse};
 const FLUSH_INTERVAL: Duration = Duration::from_secs(5);
 
 #[derive(Resource)]
-pub(crate) struct PendingTransactionQueue {
+pub struct PendingTransactionQueue {
     pending: VecDeque<Transaction>,
     next_flush_at: Instant,
     is_flushing: bool,
@@ -73,7 +73,7 @@ impl PendingTransactionQueue {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn apply_username_messages(
+pub fn apply_username_messages(
     mut commands: Commands,
     mut receivers: Query<(Entity, &mut MessageReceiver<SetUsername>), With<ClientOf>>,
     mut players: Query<(
@@ -138,7 +138,7 @@ pub(crate) fn apply_username_messages(
     }
 }
 
-pub(crate) fn poll_persistence_responses(
+pub fn poll_persistence_responses(
     mut commands: Commands,
     channels: Res<PersistenceChannels>,
     mut queue: ResMut<PendingTransactionQueue>,
@@ -271,7 +271,7 @@ fn handle_flush_response(
     }
 }
 
-pub(crate) fn apply_persistence_transactions(
+pub fn apply_persistence_transactions(
     mut messages: MessageReader<Transaction>,
     mut players: Query<(&PlayerUsername, &mut CachedPersistentState), With<PersistenceReady>>,
     mut queue: ResMut<PendingTransactionQueue>,
@@ -332,7 +332,7 @@ fn apply_transaction(
     Ok(())
 }
 
-pub(crate) fn flush_persistence_queue(
+pub fn flush_persistence_queue(
     channels: Res<PersistenceChannels>,
     mut queue: ResMut<PendingTransactionQueue>,
     players: Query<(&PlayerUsername, &CachedPersistentState), With<PersistenceReady>>,

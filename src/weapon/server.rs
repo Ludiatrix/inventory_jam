@@ -23,7 +23,7 @@ impl Plugin for WeaponServerPlugin {
     }
 }
 
-pub(crate) fn ensure_player_weapon_cooldowns(
+pub fn ensure_player_weapon_cooldowns(
     mut commands: Commands,
     players: Query<Entity, (With<PlayerId>, Without<WeaponCooldown>)>,
 ) {

@@ -4,7 +4,7 @@ use bevy::prelude::*;
 ///
 /// Fragments always spawn in the arena.
 #[derive(Message, Clone, Copy, Debug)]
-pub(crate) struct SpawnFragmentPool {
+pub struct SpawnFragmentPool {
     pub center: Vec2,
     pub total_value: u32,
 }

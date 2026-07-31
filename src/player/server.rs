@@ -31,8 +31,8 @@ struct EnemyContactDamageCooldown {
 }
 
 #[derive(Component, Clone, Copy, Debug, Default)]
-pub(crate) struct PlayerDeathTimer {
-    pub(crate) remaining_seconds: f32,
+pub struct PlayerDeathTimer {
+    pub remaining_seconds: f32,
 }
 
 #[derive(Component, Clone, Copy, Debug, Default)]
@@ -74,7 +74,7 @@ impl Plugin for PlayerServerPlugin {
     }
 }
 
-pub(crate) fn add_requested_aristeia(
+pub fn add_requested_aristeia(
     settings: Res<GameSettings>,
     mut requests: MessageReader<AddAristeiaPoints>,
     mut players: Query<(&PlayerId, &mut PlayerAristeia)>,
@@ -147,7 +147,7 @@ fn tick_player_aristeia(
     }
 }
 
-pub(crate) fn handle_connected(
+pub fn handle_connected(
     trigger: On<Add, Connected>,
     query: Query<&RemoteId, With<ClientOf>>,
     settings: Res<GameSettings>,
@@ -195,7 +195,7 @@ pub(crate) fn handle_connected(
     );
 }
 
-pub(crate) fn authoritative_player_movement(
+pub fn authoritative_player_movement(
     settings: Res<GameSettings>,
     mut players: Query<
         (
@@ -212,7 +212,7 @@ pub(crate) fn authoritative_player_movement(
     }
 }
 
-pub(crate) fn authoritative_player_aim(
+pub fn authoritative_player_aim(
     mut players: Query<(&ActionState<PlayerAction>, &mut PlayerAimDirection), With<PlayerId>>,
 ) {
     for (actions, mut aim_direction) in &mut players {
@@ -369,7 +369,7 @@ fn apply_enemy_contact_damage(
     }
 }
 
-pub(crate) fn apply_death_penalty(
+pub fn apply_death_penalty(
     transactions: &mut MessageWriter<Transaction>,
     settings: &GameSettings,
     cache: Option<&CachedPersistentState>,

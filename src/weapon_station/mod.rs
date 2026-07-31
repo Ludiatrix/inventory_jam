@@ -24,7 +24,7 @@ impl Plugin for WeaponStationPlugin {
     }
 }
 
-pub(crate) fn upgrade_station_label(kind: UpgradeStatKind, level: u32, cost: u32) -> String {
+pub fn upgrade_station_label(kind: UpgradeStatKind, level: u32, cost: u32) -> String {
     let name = match kind {
         UpgradeStatKind::Damage => "Damage",
         UpgradeStatKind::AttackSpeed => "Atk Spd",

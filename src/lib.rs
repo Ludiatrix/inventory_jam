@@ -1,0 +1,21 @@
+pub mod app;
+#[cfg(all(feature = "client", not(feature = "gui")))]
+pub mod bot;
+pub mod combat;
+pub mod debug_stats;
+pub mod enemy;
+pub mod fragment;
+pub mod gate;
+pub mod networking;
+pub mod persistence;
+pub mod player;
+pub mod projectile;
+pub mod protocol;
+#[cfg(feature = "server")]
+pub mod server;
+pub mod settings;
+pub mod shared;
+pub mod ui;
+pub mod weapon;
+pub mod weapon_station;
+pub mod world;

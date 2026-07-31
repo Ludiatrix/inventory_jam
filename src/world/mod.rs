@@ -1,5 +1,5 @@
 #[cfg(feature = "server")]
-pub(crate) mod api;
+pub mod api;
 pub mod protocol;
 #[cfg(feature = "gui")]
 mod render;

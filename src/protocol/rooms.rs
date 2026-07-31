@@ -13,7 +13,7 @@ pub enum GameRooms {
 #[derive(
     Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Reflect, Deref, DerefMut,
 )]
-pub(crate) struct GameRoom {
+pub struct GameRoom {
     pub room: GameRooms,
 }
 

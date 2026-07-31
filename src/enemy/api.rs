@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::enemy::EnemyKind;
 
 #[derive(Message, Clone, Copy, Debug)]
-pub(crate) struct SpawnEnemy {
+pub struct SpawnEnemy {
     pub position: Vec2,
     pub kind: EnemyKind,
     pub spawner: Option<Entity>,

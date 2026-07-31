@@ -16,7 +16,7 @@ use crate::{
     weapon::protocol::WeaponCooldown,
 };
 
-pub(crate) fn fire_equipped_weapons(
+pub fn fire_equipped_weapons(
     mut players: Query<(
         Has<Predicted>,
         &PlayerPosition,

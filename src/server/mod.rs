@@ -17,7 +17,7 @@ impl Plugin for ExampleServerPlugin {
     }
 }
 
-pub(crate) fn handle_new_client(trigger: On<Add, LinkOf>, mut commands: Commands) {
+pub fn handle_new_client(trigger: On<Add, LinkOf>, mut commands: Commands) {
     commands
         .entity(trigger.entity)
         .insert((ReplicationSender, Name::from("Client")));

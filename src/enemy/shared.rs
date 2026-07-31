@@ -28,7 +28,7 @@ use crate::{
     weapon::protocol::WeaponCooldown,
 };
 
-pub(crate) fn simulate_enemy_ai(
+pub fn simulate_enemy_ai(
     mut enemies: Query<(
         Has<Predicted>,
         &mut EnemyPosition,
@@ -172,7 +172,7 @@ pub(crate) fn simulate_enemy_ai(
     }
 }
 
-pub(crate) fn fire_enemy_projectiles(
+pub fn fire_enemy_projectiles(
     mut enemies: Query<(
         Has<Predicted>,
         &EnemyPosition,

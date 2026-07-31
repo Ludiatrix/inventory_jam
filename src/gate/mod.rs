@@ -9,7 +9,7 @@ use bevy::app::{App, Plugin};
 
 pub use protocol::{GateKind, GateOpen, GatePosition, GateProgress};
 #[cfg(feature = "server")]
-pub(crate) use server::GateTeleportCooldown;
+pub use server::GateTeleportCooldown;
 
 pub struct GatePlugin;
 

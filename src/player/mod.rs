@@ -2,7 +2,7 @@
 mod client;
 
 #[cfg(feature = "client")]
-pub(crate) mod nearest_enemy_aim;
+pub mod nearest_enemy_aim;
 
 pub mod protocol;
 
@@ -10,7 +10,7 @@ pub mod protocol;
 mod render;
 
 #[cfg(feature = "server")]
-pub(crate) mod server;
+pub mod server;
 
 pub mod shared;
 

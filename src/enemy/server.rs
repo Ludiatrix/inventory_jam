@@ -46,19 +46,19 @@ impl Plugin for EnemyServerPlugin {
 }
 
 #[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) enum EnemySpawnSet {
+pub enum EnemySpawnSet {
     Request,
     Spawn,
 }
 
 #[derive(Component, Clone, Copy, Debug)]
-pub(crate) struct EnemySpawnerOwner(pub Entity);
+pub struct EnemySpawnerOwner(pub Entity);
 
 #[derive(Component, Clone, Copy, Debug, Default)]
-pub(crate) struct SpawnerSpawnAccumulator(pub f32);
+pub struct SpawnerSpawnAccumulator(pub f32);
 
 #[derive(Component, Clone, Copy, Debug)]
-pub(crate) struct SpawnerTierIndex(pub u8);
+pub struct SpawnerTierIndex(pub u8);
 
 fn place_enemy_spawners(
     mut commands: Commands,
@@ -270,7 +270,7 @@ fn best_spawn_candidate(
     best
 }
 
-pub(crate) fn spawn_requested_enemy(
+pub fn spawn_requested_enemy(
     mut commands: Commands,
     settings: Res<GameSettings>,
     spawners: Query<&EnemySpawnerPosition>,

@@ -1,12 +1,12 @@
 #[cfg(feature = "client")]
 mod client;
-pub(crate) mod protocol;
+pub mod protocol;
 #[cfg(feature = "gui")]
 mod render;
 #[cfg(feature = "server")]
 mod server;
-pub(crate) mod shared;
-pub(crate) mod spatial;
+pub mod shared;
+pub mod spatial;
 
 use bevy::app::{App, Plugin};
 

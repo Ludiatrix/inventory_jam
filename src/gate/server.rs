@@ -14,7 +14,7 @@ use crate::{
 };
 
 #[derive(Component, Clone, Copy, Debug, Default)]
-pub(crate) struct GateTeleportCooldown {
+pub struct GateTeleportCooldown {
     pub remaining_ticks: u16,
 }
 

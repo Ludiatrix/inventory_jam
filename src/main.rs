@@ -1,52 +1,30 @@
-mod app;
-#[cfg(all(feature = "client", not(feature = "gui")))]
-mod bot;
-mod combat;
-mod debug_stats;
-mod enemy;
-mod fragment;
-mod gate;
-mod networking;
-mod persistence;
-mod player;
-mod projectile;
-mod protocol;
-#[cfg(feature = "server")]
-mod server;
-mod settings;
-mod shared;
-mod ui;
-mod weapon;
-mod weapon_station;
-mod world;
-
-use crate::settings::{GameSettings, GameSettingsLoadError};
-use app::*;
 use bevy::log::{Level, LogPlugin};
 use bevy::prelude::*;
 #[cfg(feature = "gui")]
 use bevy::window::PresentMode;
 #[cfg(feature = "gui")]
 use bevy::winit::WinitSettings;
+use inventory_jam::app::*;
 #[cfg(all(feature = "client", not(feature = "gui")))]
-use bot::BotPlugin;
-use combat::CombatPlugin;
-use debug_stats::DebugStatsPlugin;
-use enemy::EnemyPlugin;
-use fragment::FragmentPlugin;
-use gate::GatePlugin;
-use persistence::PersistencePlugin;
-use player::PlayerPlugin;
-use projectile::ProjectilePlugin;
+use inventory_jam::bot::BotPlugin;
+use inventory_jam::combat::CombatPlugin;
+use inventory_jam::debug_stats::DebugStatsPlugin;
+use inventory_jam::enemy::EnemyPlugin;
+use inventory_jam::fragment::FragmentPlugin;
+use inventory_jam::gate::GatePlugin;
+use inventory_jam::networking;
+use inventory_jam::persistence::PersistencePlugin;
+use inventory_jam::player::PlayerPlugin;
+use inventory_jam::projectile::ProjectilePlugin;
 #[cfg(feature = "server")]
-use server::ExampleServerPlugin;
-use shared::SharedPlugin;
+use inventory_jam::server::ExampleServerPlugin;
+use inventory_jam::settings::{GameSettings, GameSettingsLoadError};
+use inventory_jam::shared::SharedPlugin;
+use inventory_jam::ui::UiPlugin;
+use inventory_jam::weapon::WeaponPlugin;
+use inventory_jam::weapon_station::WeaponStationPlugin;
+use inventory_jam::world::WorldPlugin;
 use std::{process::ExitCode, time::Duration};
-use weapon::WeaponPlugin;
-use weapon_station::WeaponStationPlugin;
-use world::WorldPlugin;
-
-use crate::ui::UiPlugin;
 
 const TICK_DURATION: Duration =
     Duration::from_nanos((1_000_000_000.0 / networking::FIXED_TIMESTEP_HZ) as u64);
@@ -124,7 +102,7 @@ fn base_app() -> App {
 
     #[cfg(feature = "gui")]
     {
-        use crate::shared::GAME_NAME;
+        use inventory_jam::shared::GAME_NAME;
 
         app.add_plugins(
             DefaultPlugins
