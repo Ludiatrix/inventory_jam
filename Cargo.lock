@@ -2855,6 +2855,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "core"
+version = "0.1.0"
+dependencies = [
+ "aeronet_io",
+ "anyhow",
+ "async-compat",
+ "bevy",
+ "bevy_asset_loader",
+ "bevy_kira_audio",
+ "bevy_mod_reqwest",
+ "clap",
+ "getrandom 0.2.17",
+ "getrandom 0.4.3",
+ "hex",
+ "image",
+ "js-sys",
+ "leafwing-input-manager",
+ "lightyear",
+ "log",
+ "rand 0.9.4",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "tokio",
+ "uuid",
+ "virtual_joystick",
+ "wasm-bindgen",
+ "web-sys",
+ "webbrowser",
+ "winit",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4603,42 +4637,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "inventory_jam"
-version = "0.1.0"
-dependencies = [
- "aeronet_io",
- "anyhow",
- "async-compat",
- "bevy",
- "bevy-inspector-egui",
- "bevy_asset_loader",
- "bevy_kira_audio",
- "bevy_mod_reqwest",
- "clap",
- "embed-resource",
- "getrandom 0.2.17",
- "getrandom 0.4.3",
- "hex",
- "image",
- "js-sys",
- "leafwing-input-manager",
- "lightyear",
- "log",
- "rand 0.9.4",
- "serde",
- "serde_json",
- "sha2",
- "sqlx",
- "tokio",
- "uuid",
- "virtual_joystick",
- "wasm-bindgen",
- "web-sys",
- "webbrowser",
- "winit",
-]
-
-[[package]]
 name = "ipnet"
 version = "2.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5663,6 +5661,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a1b95cd5421ec55b445b5ae102f5ea0e768de1f82bd3001e11f426c269c3aea"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "main-bevy"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy-inspector-egui",
+ "core",
+ "embed-resource",
+ "lightyear",
 ]
 
 [[package]]

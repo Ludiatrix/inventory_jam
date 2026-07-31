@@ -657,11 +657,11 @@ impl GameSettings {
         {
             let _ = file_path;
             let json = match file_name {
-                "world.json" => include_str!("../../assets/settings/world.json"),
-                "player.json" => include_str!("../../assets/settings/player.json"),
-                "enemies.json" => include_str!("../../assets/settings/enemies.json"),
-                "graphics.json" => include_str!("../../assets/settings/graphics.json"),
-                "bots.json" => include_str!("../../assets/settings/bots.json"),
+                "world.json" => include_str!("../../../main-bevy/assets/settings/world.json"),
+                "player.json" => include_str!("../../../main-bevy/assets/settings/player.json"),
+                "enemies.json" => include_str!("../../../main-bevy/assets/settings/enemies.json"),
+                "graphics.json" => include_str!("../../../main-bevy/assets/settings/graphics.json"),
+                "bots.json" => include_str!("../../../main-bevy/assets/settings/bots.json"),
                 _ => {
                     return Err(GameSettingsLoadError::Invalid(format!(
                         "unknown embedded settings file {file_name}"

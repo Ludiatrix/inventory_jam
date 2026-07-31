@@ -4,26 +4,26 @@ use bevy::prelude::*;
 use bevy::window::PresentMode;
 #[cfg(feature = "gui")]
 use bevy::winit::WinitSettings;
-use inventory_jam::app::*;
+use core::app::*;
 #[cfg(all(feature = "client", not(feature = "gui")))]
-use inventory_jam::bot::BotPlugin;
-use inventory_jam::combat::CombatPlugin;
-use inventory_jam::debug_stats::DebugStatsPlugin;
-use inventory_jam::enemy::EnemyPlugin;
-use inventory_jam::fragment::FragmentPlugin;
-use inventory_jam::gate::GatePlugin;
-use inventory_jam::networking;
-use inventory_jam::persistence::PersistencePlugin;
-use inventory_jam::player::PlayerPlugin;
-use inventory_jam::projectile::ProjectilePlugin;
+use core::bot::BotPlugin;
+use core::combat::CombatPlugin;
+use core::debug_stats::DebugStatsPlugin;
+use core::enemy::EnemyPlugin;
+use core::fragment::FragmentPlugin;
+use core::gate::GatePlugin;
+use core::networking;
+use core::persistence::PersistencePlugin;
+use core::player::PlayerPlugin;
+use core::projectile::ProjectilePlugin;
 #[cfg(feature = "server")]
-use inventory_jam::server::ExampleServerPlugin;
-use inventory_jam::settings::{GameSettings, GameSettingsLoadError};
-use inventory_jam::shared::SharedPlugin;
-use inventory_jam::ui::UiPlugin;
-use inventory_jam::weapon::WeaponPlugin;
-use inventory_jam::weapon_station::WeaponStationPlugin;
-use inventory_jam::world::WorldPlugin;
+use core::server::ExampleServerPlugin;
+use core::settings::{GameSettings, GameSettingsLoadError};
+use core::shared::SharedPlugin;
+use core::ui::UiPlugin;
+use core::weapon::WeaponPlugin;
+use core::weapon_station::WeaponStationPlugin;
+use core::world::WorldPlugin;
 use std::{process::ExitCode, time::Duration};
 
 const TICK_DURATION: Duration =
@@ -43,7 +43,11 @@ fn main() -> ExitCode {
 }
 
 fn run() -> Result<(), GameSettingsLoadError> {
-    let settings = GameSettings::load("assets/settings")?;
+    let settings_dir = match std::env::var("CARGO_MANIFEST_DIR") {
+        Ok(manifest_dir) => format!("{manifest_dir}/assets/settings"),
+        Err(_) => "assets/settings".to_owned(),
+    };
+    let settings = GameSettings::load(&settings_dir)?;
 
     let config = config_from_env();
     let mut app = base_app();
@@ -102,7 +106,7 @@ fn base_app() -> App {
 
     #[cfg(feature = "gui")]
     {
-        use inventory_jam::shared::GAME_NAME;
+        use core::shared::GAME_NAME;
 
         app.add_plugins(
             DefaultPlugins
