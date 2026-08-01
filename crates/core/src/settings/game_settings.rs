@@ -77,7 +77,11 @@ pub struct EnemySpriteVariantSettings {
 
 impl EnemySpriteVariantSettings {
     fn is_valid(&self) -> bool {
-        self.idle.is_valid() && self.flash.as_ref().is_none_or(WeaponSpriteSheetSettings::is_valid)
+        self.idle.is_valid()
+            && self
+                .flash
+                .as_ref()
+                .is_none_or(WeaponSpriteSheetSettings::is_valid)
     }
 }
 

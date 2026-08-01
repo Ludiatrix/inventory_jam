@@ -19,7 +19,7 @@ fn main() {
                 "--quit-after".to_string(),
                 "10000".to_string(),
             ]))
-                .build()
+            .build()
         })
         .and_then(|r| r.execute())
         .unwrap_or_else(gdenv_lib::api::errors::print_error_stack);

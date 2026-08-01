@@ -49,6 +49,10 @@ impl ProjectileHitHistory {
         self.count as usize
     }
 
+    pub fn is_empty(self) -> bool {
+        self.count == 0
+    }
+
     pub fn is_full(self) -> bool {
         self.len() >= MAX_PROJECTILE_HIT_HISTORY
     }
