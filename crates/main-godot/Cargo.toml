@@ -1,0 +1,29 @@
+[package]
+name = "main-godot"
+version.workspace = true
+publish.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+
+# Add this new section:
+[[bin]]
+name = "arena_of_champions"
+path = "run_godot.rs"
+
+[lib]
+crate-type = ["cdylib"]
+
+# Update your dependencies section with:
+[dependencies]
+gdenv-lib = "1.1.0"
+godot = "0.4"
+# Add godot-bevy-test if you want to also set up integration tests
+# godot-bevy-test = { version = "0.11", optional = true }
+
+# Update or add your features section with:
+[features]
+# Add godot-bevy-test if you want to also set up integration tests
+itest = [
+    # "dep:godot-bevy-test"
+]
